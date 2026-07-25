@@ -81,7 +81,7 @@ function reviewOptions(overrides = {}) {
       runUrl: "https://github.example/actions/runs/9",
       mascotUrl,
       apiKey: "test-api-key",
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       submissionOnly: true,
       ...overrides,
     },
@@ -222,14 +222,14 @@ describe("reviewPullRequest", () => {
       runUrl: "https://github.example/actions/runs/9",
       mascotUrl,
       apiKey: "test-api-key",
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       submissionOnly: true,
     });
 
     expect(checks).toHaveLength(1);
     expect(checks[0].headSha).toBe("a".repeat(40));
     expect(reviews).toHaveLength(2);
-    expect(reviews[0]).toMatchObject({ model: "opencode-go/kimi-k2.7-code", apiKey: "test-api-key" });
+    expect(reviews[0]).toMatchObject({ model: "opencode-go/deepseek-v4-flash", apiKey: "test-api-key" });
     expect(reviews.map(({ prompt }) => prompt.includes("class Solution { int first; }"))).toEqual([true, false]);
     expect(reviews.map(({ prompt }) => prompt.includes("class Solution { int second; }"))).toEqual([false, true]);
     expect(comments).toHaveLength(3);
@@ -865,7 +865,7 @@ describe("opencode-review CLI", () => {
         GITHUB_RUN_ID: "9",
         GITHUB_RUN_ATTEMPT: "1",
         OPENCODE_API_KEY: "opencode-secret",
-        OPENCODE_REVIEW_MODEL: "opencode-go/kimi-k2.7-code",
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
       },
       githubClient,
       openCodeClient: { review: async ({ prompt }) => { prompts.push(prompt); return passResult(firstPath); } },
@@ -1009,7 +1009,7 @@ describe("opencode-review CLI", () => {
         GITHUB_RUN_ID: "9",
         GITHUB_RUN_ATTEMPT: "1",
         OPENCODE_API_KEY: "opencode-secret",
-        OPENCODE_REVIEW_MODEL: "opencode-go/kimi-k2.7-code",
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
       },
       loadReviewScope: async () => ({ submissionOnly: true, changedFiles: [{ status: "A", path: firstPath }] }),
       githubClient: options.githubClient,
@@ -1036,7 +1036,7 @@ describe("opencode-review CLI", () => {
         GITHUB_RUN_ID: "9",
         GITHUB_RUN_ATTEMPT: "1",
         OPENCODE_API_KEY: "opencode-secret",
-        OPENCODE_REVIEW_MODEL: "opencode-go/kimi-k2.7-code",
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
       },
       loadReviewScope: async () => ({ submissionOnly: true, changedFiles: [{ status: "A", path: firstPath }] }),
       githubClient: options.githubClient,
@@ -1066,7 +1066,7 @@ describe("opencode-review CLI", () => {
         GITHUB_RUN_ID: "9",
         GITHUB_RUN_ATTEMPT: "1",
         OPENCODE_API_KEY: "opencode-secret",
-        OPENCODE_REVIEW_MODEL: "opencode-go/kimi-k2.7-code",
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
       },
       loadReviewScope: async () => ({ submissionOnly: true, changedFiles: [{ status: "A", path: firstPath }] }),
       githubClient: options.githubClient,
@@ -1095,7 +1095,7 @@ describe("opencode-review CLI", () => {
         GITHUB_RUN_ID: "9",
         GITHUB_RUN_ATTEMPT: "1",
         OPENCODE_API_KEY: "opencode-secret",
-        OPENCODE_REVIEW_MODEL: "opencode-go/kimi-k2.7-code",
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
       },
       loadReviewScope: async () => { calls.push("changed-files"); throw new Error(rawFailure); },
       githubClient: options.githubClient,

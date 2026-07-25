@@ -18,7 +18,7 @@ describe("OpenCodeClient", () => {
     });
 
     await expect(client.review({
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       apiKey: "test-secret",
       prompt: "review prompt",
     })).resolves.toBe("review result");
@@ -26,7 +26,7 @@ describe("OpenCodeClient", () => {
     expect(requests[0].url).toBe("https://opencode.ai/zen/go/v1/chat/completions");
     expect(requests[0].init.headers.Authorization).toBe("Bearer test-secret");
     expect(JSON.parse(requests[0].init.body)).toEqual({
-      model: "kimi-k2.7-code",
+      model: "deepseek-v4-flash",
       messages: [{ role: "user", content: "review prompt" }],
     });
   });
@@ -49,7 +49,7 @@ describe("OpenCodeClient", () => {
         },
       });
       const failurePromise = client.review({
-        model: "opencode-go/kimi-k2.7-code",
+        model: "opencode-go/deepseek-v4-flash",
         apiKey,
         prompt: "review prompt",
       }).catch((failure) => failure);
@@ -84,14 +84,14 @@ describe("OpenCodeClient", () => {
       fetchImpl: async () => jsonResponse({ error: responseBody }, { status: 429, headers: { "request-id": "oc-request-1" } }),
     });
 
-    await expect(client.review({ model: "opencode-go/kimi-k2.7-code", apiKey, prompt: "review prompt" })).rejects.toMatchObject({
+    await expect(client.review({ model: "opencode-go/deepseek-v4-flash", apiKey, prompt: "review prompt" })).rejects.toMatchObject({
       stage: "model-request",
       reason: "MODEL_REQUEST_FAILED",
       retryable: true,
       httpStatus: 429,
       requestId: "oc-request-1",
     });
-    await client.review({ model: "opencode-go/kimi-k2.7-code", apiKey, prompt: "review prompt" }).catch((failure) => {
+    await client.review({ model: "opencode-go/deepseek-v4-flash", apiKey, prompt: "review prompt" }).catch((failure) => {
       expect(failure.detail).not.toContain(apiKey);
       expect(failure.detail).not.toContain(responseBody);
     });
@@ -100,7 +100,7 @@ describe("OpenCodeClient", () => {
   it.each([
     "other/kimi-k2.7-code",
     "opencode-go/other-model",
-    "opencode-go/kimi-k2.7-code-extra",
+    "opencode-go/deepseek-v4-flash-extra",
     "kimi-k2.7-code",
     "",
   ])("rejects unsupported configured model %j before fetching", async (model) => {
@@ -128,7 +128,7 @@ describe("OpenCodeClient", () => {
     const client = new OpenCodeClient({ fetchImpl: async () => jsonResponse({ ...body, rawSentinel }) });
 
     await expect(client.review({
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       apiKey: "test-secret",
       prompt: "review prompt",
     })).rejects.toMatchObject({
@@ -137,7 +137,7 @@ describe("OpenCodeClient", () => {
       retryable: false,
     });
     await client.review({
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       apiKey: "test-secret",
       prompt: "review prompt",
     }).catch((failure) => expect(failure.detail).not.toContain(rawSentinel));
