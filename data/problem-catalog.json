@@ -7,7 +7,8 @@
     "https://github.com/honood/leetcode/blob/main/README.md",
     "https://blog.nuomi1.com/archives/2018/12/leetcode-top-interview-questions-easy-swift-exercises.html",
     "https://school.programmers.co.kr/learn/challenges?levels=0&levels=1&levels=2&levels=3&levels=4&levels=5",
-    "https://swexpertacademy.com/main/code/problem/problemList.do"
+    "https://swexpertacademy.com/main/code/problem/problemList.do",
+    "programmers-high-score-kit"
   ],
   "lists": [
     {
@@ -29561,6 +29562,298 @@
           "order": 1124,
           "section": "D7",
           "submissionKey": "27008"
+        }
+      ]
+    },
+    {
+      "key": "programmers-high-score-kit",
+      "title": "프로그래머스 고득점 Kit",
+      "url": "https://school.programmers.co.kr/learn/challenges?tab=algorithm_practice_kit",
+      "summary": [
+        "코딩테스트 고득점 Kit - 프로그래머스가 선별한 코딩테스트 유형별 문제 모음"
+      ],
+      "items": [
+        {
+          "problemKey": "programmers:42576",
+          "order": 1,
+          "section": "해시",
+          "submissionKey": "42576"
+        },
+        {
+          "problemKey": "programmers:1845",
+          "order": 2,
+          "section": "해시",
+          "submissionKey": "1845"
+        },
+        {
+          "problemKey": "programmers:42577",
+          "order": 3,
+          "section": "해시",
+          "submissionKey": "42577"
+        },
+        {
+          "problemKey": "programmers:42578",
+          "order": 4,
+          "section": "해시",
+          "submissionKey": "42578"
+        },
+        {
+          "problemKey": "programmers:42579",
+          "order": 5,
+          "section": "해시",
+          "submissionKey": "42579"
+        },
+        {
+          "problemKey": "programmers:12906",
+          "order": 6,
+          "section": "스택/큐",
+          "submissionKey": "12906"
+        },
+        {
+          "problemKey": "programmers:42586",
+          "order": 7,
+          "section": "스택/큐",
+          "submissionKey": "42586"
+        },
+        {
+          "problemKey": "programmers:12909",
+          "order": 8,
+          "section": "스택/큐",
+          "submissionKey": "12909"
+        },
+        {
+          "problemKey": "programmers:42587",
+          "order": 9,
+          "section": "스택/큐",
+          "submissionKey": "42587"
+        },
+        {
+          "problemKey": "programmers:42583",
+          "order": 10,
+          "section": "스택/큐",
+          "submissionKey": "42583"
+        },
+        {
+          "problemKey": "programmers:42584",
+          "order": 11,
+          "section": "스택/큐",
+          "submissionKey": "42584"
+        },
+        {
+          "problemKey": "programmers:42626",
+          "order": 12,
+          "section": "힙(Heap)",
+          "submissionKey": "42626"
+        },
+        {
+          "problemKey": "programmers:42627",
+          "order": 13,
+          "section": "힙(Heap)",
+          "submissionKey": "42627"
+        },
+        {
+          "problemKey": "programmers:42628",
+          "order": 14,
+          "section": "힙(Heap)",
+          "submissionKey": "42628"
+        },
+        {
+          "problemKey": "programmers:42748",
+          "order": 15,
+          "section": "정렬",
+          "submissionKey": "42748"
+        },
+        {
+          "problemKey": "programmers:42746",
+          "order": 16,
+          "section": "정렬",
+          "submissionKey": "42746"
+        },
+        {
+          "problemKey": "programmers:42747",
+          "order": 17,
+          "section": "정렬",
+          "submissionKey": "42747"
+        },
+        {
+          "problemKey": "programmers:86491",
+          "order": 18,
+          "section": "완전탐색",
+          "submissionKey": "86491"
+        },
+        {
+          "problemKey": "programmers:42840",
+          "order": 19,
+          "section": "완전탐색",
+          "submissionKey": "42840"
+        },
+        {
+          "problemKey": "programmers:42839",
+          "order": 20,
+          "section": "완전탐색",
+          "submissionKey": "42839"
+        },
+        {
+          "problemKey": "programmers:42842",
+          "order": 21,
+          "section": "완전탐색",
+          "submissionKey": "42842"
+        },
+        {
+          "problemKey": "programmers:87946",
+          "order": 22,
+          "section": "완전탐색",
+          "submissionKey": "87946"
+        },
+        {
+          "problemKey": "programmers:86971",
+          "order": 23,
+          "section": "완전탐색",
+          "submissionKey": "86971"
+        },
+        {
+          "problemKey": "programmers:84512",
+          "order": 24,
+          "section": "완전탐색",
+          "submissionKey": "84512"
+        },
+        {
+          "problemKey": "programmers:42862",
+          "order": 25,
+          "section": "탐욕법(Greedy)",
+          "submissionKey": "42862"
+        },
+        {
+          "problemKey": "programmers:42860",
+          "order": 26,
+          "section": "탐욕법(Greedy)",
+          "submissionKey": "42860"
+        },
+        {
+          "problemKey": "programmers:42883",
+          "order": 27,
+          "section": "탐욕법(Greedy)",
+          "submissionKey": "42883"
+        },
+        {
+          "problemKey": "programmers:42885",
+          "order": 28,
+          "section": "탐욕법(Greedy)",
+          "submissionKey": "42885"
+        },
+        {
+          "problemKey": "programmers:42861",
+          "order": 29,
+          "section": "탐욕법(Greedy)",
+          "submissionKey": "42861"
+        },
+        {
+          "problemKey": "programmers:42884",
+          "order": 30,
+          "section": "탐욕법(Greedy)",
+          "submissionKey": "42884"
+        },
+        {
+          "problemKey": "programmers:42895",
+          "order": 31,
+          "section": "동적계획법(Dynamic Programming)",
+          "submissionKey": "42895"
+        },
+        {
+          "problemKey": "programmers:43105",
+          "order": 32,
+          "section": "동적계획법(Dynamic Programming)",
+          "submissionKey": "43105"
+        },
+        {
+          "problemKey": "programmers:42898",
+          "order": 33,
+          "section": "동적계획법(Dynamic Programming)",
+          "submissionKey": "42898"
+        },
+        {
+          "problemKey": "programmers:1843",
+          "order": 34,
+          "section": "동적계획법(Dynamic Programming)",
+          "submissionKey": "1843"
+        },
+        {
+          "problemKey": "programmers:42897",
+          "order": 35,
+          "section": "동적계획법(Dynamic Programming)",
+          "submissionKey": "42897"
+        },
+        {
+          "problemKey": "programmers:43165",
+          "order": 36,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "43165"
+        },
+        {
+          "problemKey": "programmers:43162",
+          "order": 37,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "43162"
+        },
+        {
+          "problemKey": "programmers:1844",
+          "order": 38,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "1844"
+        },
+        {
+          "problemKey": "programmers:43163",
+          "order": 39,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "43163"
+        },
+        {
+          "problemKey": "programmers:87694",
+          "order": 40,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "87694"
+        },
+        {
+          "problemKey": "programmers:43164",
+          "order": 41,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "43164"
+        },
+        {
+          "problemKey": "programmers:84021",
+          "order": 42,
+          "section": "깊이/너비 우선 탐색(DFS/BFS)",
+          "submissionKey": "84021"
+        },
+        {
+          "problemKey": "programmers:43238",
+          "order": 43,
+          "section": "이분탐색",
+          "submissionKey": "43238"
+        },
+        {
+          "problemKey": "programmers:43236",
+          "order": 44,
+          "section": "이분탐색",
+          "submissionKey": "43236"
+        },
+        {
+          "problemKey": "programmers:49189",
+          "order": 45,
+          "section": "그래프",
+          "submissionKey": "49189"
+        },
+        {
+          "problemKey": "programmers:49191",
+          "order": 46,
+          "section": "그래프",
+          "submissionKey": "49191"
+        },
+        {
+          "problemKey": "programmers:49190",
+          "order": 47,
+          "section": "그래프",
+          "submissionKey": "49190"
         }
       ]
     }

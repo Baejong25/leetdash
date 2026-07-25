@@ -15,6 +15,7 @@ describe("problem catalog", () => {
       ["top-interview-150", 150],
       ["programmers", 689],
       ["swea", 1124],
+      ["programmers-high-score-kit", 47],
     ]);
   });
 
