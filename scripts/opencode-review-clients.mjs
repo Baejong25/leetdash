@@ -1,8 +1,8 @@
 import { parseManagedReviewMarker, ReviewFailure } from "./opencode-review-core.mjs";
 
 const openCodeChatCompletionsUrl = "https://opencode.ai/zen/go/v1/chat/completions";
-const openCodeConfiguredModel = "opencode-go/kimi-k2.7-code";
-const openCodeApiModel = "kimi-k2.7-code";
+const openCodeConfiguredModel = "opencode-go/deepseek-v4-flash";
+const openCodeApiModel = "deepseek-v4-flash";
 const openCodeRequestTimeoutMs = 180_000;
 
 function extractRequestId(response) {
