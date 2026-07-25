@@ -1,91 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { GitHubReviewClient, LeetCodeClient, OpenCodeClient } from "../scripts/opencode-review-clients.mjs";
-
-const rawQuestion = {
-  content: "<p>Find two numbers.</p>",
-  exampleTestcases: "[2,7,11,15]\n9",
-  metaData: JSON.stringify({ name: "twoSum", params: [{ name: "nums", type: "integer[]" }] }),
-  codeSnippets: [{ lang: "Java", langSlug: "java", code: "class Solution { public int[] twoSum(int[] nums, int target) {} }" }],
-  topicTags: [{ name: "Array", slug: "array" }],
-};
+import { GitHubReviewClient, OpenCodeClient } from "../scripts/opencode-review-clients.mjs";
+import { reviewContentKey, reviewContentMarker, reviewFileKey, reviewFileMarker } from "../scripts/opencode-review-core.mjs";
 
 function jsonResponse(body, { status = 200, headers = {} } = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
 }
-
-describe("LeetCodeClient", () => {
-  it("deduplicates concurrent slug requests without writing a permanent cache", async () => {
-    const requests = [];
-    const fetchImpl = async (url, init) => {
-      requests.push({ url: String(url), init });
-      return jsonResponse({ data: { question: rawQuestion } });
-    };
-    const client = new LeetCodeClient({ fetchImpl });
-
-    const [first, second] = await Promise.all([client.getQuestion("two-sum"), client.getQuestion("two-sum")]);
-
-    expect(first).toEqual(rawQuestion);
-    expect(second).toEqual(rawQuestion);
-    expect(requests).toHaveLength(1);
-    expect(requests[0].url).toBe("https://leetcode.com/graphql");
-    const request = JSON.parse(requests[0].init.body);
-    expect(request.query).toContain("question(titleSlug: $titleSlug)");
-    ["questionFrontendId", "title", "titleSlug", "difficulty", "content", "exampleTestcases", "metaData", "codeSnippets", "topicTags"].forEach((field) => {
-      expect(request.query).toContain(field);
-    });
-    expect(request.variables).toEqual({ titleSlug: "two-sum" });
-  });
-
-  it("returns a redacted retryable failure for LeetCode HTTP errors", async () => {
-    const secret = "Authorization: Bearer leetcode-secret";
-    const client = new LeetCodeClient({
-      fetchImpl: async () => jsonResponse({ message: secret }, { status: 503, headers: { "x-request-id": "lc-request-1" } }),
-    });
-
-    await expect(client.getQuestion("two-sum")).rejects.toMatchObject({
-      stage: "problem-fetch",
-      reason: "PROBLEM_FETCH_FAILED",
-      retryable: true,
-      httpStatus: 503,
-      requestId: "lc-request-1",
-    });
-    await client.getQuestion("another-slug").catch((failure) => {
-      expect(failure.detail).not.toContain(secret);
-      expect(failure.detail).not.toContain("message");
-    });
-  });
-
-  it("aborts a stalled LeetCode request after the bounded timeout without leaking the fetch error", async () => {
-    vi.useFakeTimers();
-    const rawError = "raw-leetcode-timeout-sentinel";
-    let requestSignal;
-    try {
-      const client = new LeetCodeClient({
-        fetchImpl: async (_url, init) => new Promise((_resolve, reject) => {
-          requestSignal = init.signal;
-          init.signal.addEventListener("abort", () => reject(new Error(rawError)), { once: true });
-        }),
-      });
-      const failurePromise = client.getQuestion("two-sum").catch((failure) => failure);
-
-      await vi.advanceTimersByTimeAsync(60_000);
-      const failure = await failurePromise;
-
-      expect(requestSignal).toBeInstanceOf(AbortSignal);
-      expect(requestSignal.aborted).toBe(true);
-      expect(failure).toMatchObject({
-        stage: "problem-fetch",
-        reason: "PROBLEM_FETCH_FAILED",
-        detail: "LeetCode request failed.",
-      });
-      expect(failure.detail).not.toContain(rawError);
-      expect(vi.getTimerCount()).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
 
 describe("OpenCodeClient", () => {
   it("sends the provider-stripped model request and returns only assistant content", async () => {
@@ -98,7 +18,7 @@ describe("OpenCodeClient", () => {
     });
 
     await expect(client.review({
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       apiKey: "test-secret",
       prompt: "review prompt",
     })).resolves.toBe("review result");
@@ -106,7 +26,7 @@ describe("OpenCodeClient", () => {
     expect(requests[0].url).toBe("https://opencode.ai/zen/go/v1/chat/completions");
     expect(requests[0].init.headers.Authorization).toBe("Bearer test-secret");
     expect(JSON.parse(requests[0].init.body)).toEqual({
-      model: "kimi-k2.7-code",
+      model: "deepseek-v4-flash",
       messages: [{ role: "user", content: "review prompt" }],
     });
   });
@@ -129,7 +49,7 @@ describe("OpenCodeClient", () => {
         },
       });
       const failurePromise = client.review({
-        model: "opencode-go/kimi-k2.7-code",
+        model: "opencode-go/deepseek-v4-flash",
         apiKey,
         prompt: "review prompt",
       }).catch((failure) => failure);
@@ -164,14 +84,14 @@ describe("OpenCodeClient", () => {
       fetchImpl: async () => jsonResponse({ error: responseBody }, { status: 429, headers: { "request-id": "oc-request-1" } }),
     });
 
-    await expect(client.review({ model: "opencode-go/kimi-k2.7-code", apiKey, prompt: "review prompt" })).rejects.toMatchObject({
+    await expect(client.review({ model: "opencode-go/deepseek-v4-flash", apiKey, prompt: "review prompt" })).rejects.toMatchObject({
       stage: "model-request",
       reason: "MODEL_REQUEST_FAILED",
       retryable: true,
       httpStatus: 429,
       requestId: "oc-request-1",
     });
-    await client.review({ model: "opencode-go/kimi-k2.7-code", apiKey, prompt: "review prompt" }).catch((failure) => {
+    await client.review({ model: "opencode-go/deepseek-v4-flash", apiKey, prompt: "review prompt" }).catch((failure) => {
       expect(failure.detail).not.toContain(apiKey);
       expect(failure.detail).not.toContain(responseBody);
     });
@@ -180,7 +100,7 @@ describe("OpenCodeClient", () => {
   it.each([
     "other/kimi-k2.7-code",
     "opencode-go/other-model",
-    "opencode-go/kimi-k2.7-code-extra",
+    "opencode-go/deepseek-v4-flash-extra",
     "kimi-k2.7-code",
     "",
   ])("rejects unsupported configured model %j before fetching", async (model) => {
@@ -208,7 +128,7 @@ describe("OpenCodeClient", () => {
     const client = new OpenCodeClient({ fetchImpl: async () => jsonResponse({ ...body, rawSentinel }) });
 
     await expect(client.review({
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       apiKey: "test-secret",
       prompt: "review prompt",
     })).rejects.toMatchObject({
@@ -217,7 +137,7 @@ describe("OpenCodeClient", () => {
       retryable: false,
     });
     await client.review({
-      model: "opencode-go/kimi-k2.7-code",
+      model: "opencode-go/deepseek-v4-flash",
       apiKey: "test-secret",
       prompt: "review prompt",
     }).catch((failure) => expect(failure.detail).not.toContain(rawSentinel));
@@ -300,51 +220,86 @@ describe("GitHubReviewClient", () => {
     });
   });
 
-  it("paginates comments and updates only an existing marked GitHub Actions comment", async () => {
+  it("publishes the dedicated review gate as a commit status", async () => {
     const requests = [];
-    const userMarker = { id: 20, body: "<!-- leetdash-opencode-review -->\nuser content", user: { login: "ada" } };
-    const pageOne = [...Array.from({ length: 99 }, (_, index) => ({ id: index + 1, body: "ordinary", user: { login: "ada" } })), userMarker];
-    const botMarker = { id: 33, body: "<!-- leetdash-opencode-review -->\nold review", user: { login: "github-actions[bot]" } };
+    const client = new GitHubReviewClient({
+      repository: "example/leetdash",
+      token: "github-secret",
+      fetchImpl: async (url, init) => {
+        requests.push({ url: String(url), init });
+        return jsonResponse({ id: 92 });
+      },
+    });
+
+    await expect(client.setCommitStatus({
+      sha: "head-123",
+      state: "pending",
+      description: "OpenCode review is running.",
+      targetUrl: "https://github.example/example/leetdash/actions/runs/9",
+    })).resolves.toEqual({ id: 92 });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toBe("https://api.github.com/repos/example/leetdash/statuses/head-123");
+    expect(requests[0].init.method).toBe("POST");
+    expect(JSON.parse(requests[0].init.body)).toEqual({
+      context: "opencode-review-gate",
+      state: "pending",
+      description: "OpenCode review is running.",
+      target_url: "https://github.example/example/leetdash/actions/runs/9",
+    });
+  });
+
+  it("paginates and discovers only managed GitHub Actions comments", async () => {
+    const requests = [];
+    const reviewPath = "submissions/ada/programmers/12906/solution.java";
+    const contentKey = reviewContentKey("class Solution {}");
+    const summary = { id: 301, body: "<!-- leetdash-opencode-review -->\nsummary", user: { login: "github-actions[bot]" } };
+    const spoof = { id: 302, body: `${reviewFileMarker(reviewPath)}\nspoof`, user: { login: "ada" } };
+    const file = { id: 303, body: `${reviewFileMarker(reviewPath)}\n${reviewContentMarker(contentKey)}\nfile`, user: { login: "github-actions[bot]" } };
+    const pageOne = [...Array.from({ length: 98 }, (_, index) => ({ id: index + 1, body: "ordinary", user: { login: "ada" } })), summary, spoof];
     const client = new GitHubReviewClient({
       repository: "example/leetdash",
       token: "github-secret",
       fetchImpl: async (url, init) => {
         requests.push({ url: String(url), init });
         const requestUrl = new URL(url);
-        if (init.method === "GET") {
-          return jsonResponse(requestUrl.searchParams.get("page") === "1" ? pageOne : [botMarker]);
-        }
-        return jsonResponse({ id: botMarker.id });
+        return jsonResponse(requestUrl.searchParams.get("page") === "1" ? pageOne : [file]);
       },
     });
 
-    await expect(client.upsertReviewComment({ pullNumber: 7, body: "<!-- leetdash-opencode-review -->\nnew review" })).resolves.toEqual({ id: 33 });
+    await expect(client.listManagedReviewComments(7)).resolves.toEqual([
+      { id: summary.id, kind: "summary" },
+      { id: file.id, kind: "file", key: reviewFileKey(reviewPath), contentKey },
+    ]);
 
-    expect(requests.slice(0, 2).map(({ url }) => url)).toEqual([
+    expect(requests.map(({ url }) => url)).toEqual([
       "https://api.github.com/repos/example/leetdash/issues/7/comments?per_page=100&page=1",
       "https://api.github.com/repos/example/leetdash/issues/7/comments?per_page=100&page=2",
     ]);
-    expect(requests[2].url).toBe("https://api.github.com/repos/example/leetdash/issues/comments/33");
-    expect(requests[2].init.method).toBe("PATCH");
-    expect(JSON.parse(requests[2].init.body)).toEqual({ body: "<!-- leetdash-opencode-review -->\nnew review" });
-    expect(requests.some(({ url }) => url.endsWith(`/comments/${userMarker.id}`))).toBe(false);
   });
 
-  it("posts a marked review comment when no GitHub Actions marker exists", async () => {
+  it("creates, updates, and deletes review comments using resolved IDs", async () => {
     const requests = [];
     const client = new GitHubReviewClient({
       repository: "example/leetdash",
       token: "github-secret",
       fetchImpl: async (url, init) => {
         requests.push({ url: String(url), init });
-        return jsonResponse(init.method === "GET" ? [] : { id: 44 });
+        return init.method === "DELETE" ? new Response(null, { status: 204 }) : jsonResponse({ id: 44 });
       },
     });
 
-    await expect(client.upsertReviewComment({ pullNumber: 7, body: "<!-- leetdash-opencode-review -->\nnew review" })).resolves.toEqual({ id: 44 });
-    expect(requests).toHaveLength(2);
-    expect(requests[1].url).toBe("https://api.github.com/repos/example/leetdash/issues/7/comments");
-    expect(requests[1].init.method).toBe("POST");
+    await expect(client.upsertReviewComment({ pullNumber: 7, commentId: 32, body: "updated" })).resolves.toEqual({ id: 44 });
+    await expect(client.upsertReviewComment({ pullNumber: 7, body: "created" })).resolves.toEqual({ id: 44 });
+    await expect(client.deleteReviewComment(32)).resolves.toBeNull();
+
+    expect(requests.map(({ url, init }) => ({ path: new URL(url).pathname, method: init.method }))).toEqual([
+      { path: "/repos/example/leetdash/issues/comments/32", method: "PATCH" },
+      { path: "/repos/example/leetdash/issues/7/comments", method: "POST" },
+      { path: "/repos/example/leetdash/issues/comments/32", method: "DELETE" },
+    ]);
+    expect(JSON.parse(requests[0].init.body)).toEqual({ body: "updated" });
+    expect(JSON.parse(requests[1].init.body)).toEqual({ body: "created" });
   });
 
   it("returns a sanitized dedicated failure for comment delivery", async () => {
@@ -378,7 +333,7 @@ describe("GitHubReviewClient", () => {
       fetchImpl: async () => jsonResponse({ unexpected: "comment response" }),
     });
 
-    await expect(client.upsertReviewComment({ pullNumber: 7, body: "<!-- leetdash-opencode-review -->\nnew review" })).rejects.toMatchObject({
+    await expect(client.listManagedReviewComments(7)).rejects.toMatchObject({
       name: "GitHubDeliveryFailure",
       detail: "GitHub review comment delivery failed",
     });

@@ -1,27 +1,11 @@
+import { createHash } from "node:crypto";
+
 const solutionPathPattern = /^submissions\/([^/]+)\/([^/]+)\/([^/]+)\/solution\.([^.\/]+)$/i;
-const leetCodeLangSlugs = Object.freeze({
-  c: "c",
-  cc: "cpp",
-  cpp: "cpp",
-  cs: "csharp",
-  dart: "dart",
-  go: "golang",
-  java: "java",
-  js: "javascript",
-  kt: "kotlin",
-  php: "php",
-  py: "python3",
-  rb: "ruby",
-  rs: "rust",
-  scala: "scala",
-  sql: "mysql",
-  swift: "swift",
-  ts: "typescript",
-});
-const blockingCategories = new Set(["correctness", "compile", "runtime", "termination", "platform-contract", "complexity"]);
-const suggestionCategories = new Set(["style", "readability", "optimization", "alternative"]);
-const modelResponseDetail = "모델 응답은 schema version 1 JSON 계약을 충족하지 못했습니다.";
-const resultValidationDetail = "모델 판정 결과의 필드가 서로 일치하지 않습니다.";
+const maxManagedCommentLength = 60_000;
+const truncationNotice = "\n\n> _Review truncated to fit the GitHub comment limit._";
+const reviewSummaryMarker = "<!-- leetdash-opencode-review -->";
+const reviewFileMarkerPattern = /^<!-- leetdash-opencode-review-file:([a-f0-9]{64}) -->$/;
+const reviewContentMarkerPattern = /^<!-- leetdash-opencode-review-content:([a-f0-9]{64}) -->$/;
 
 class ReviewFailure extends Error {
   constructor({ stage, reason, detail, retryable = false, httpStatus, requestId }) {
@@ -36,42 +20,18 @@ class ReviewFailure extends Error {
   }
 }
 
-function catalogFailure(detail) {
+function pathFailure(detail) {
   return new ReviewFailure({
-    stage: "catalog-resolve",
-    reason: "CATALOG_MAPPING_FAILED",
+    stage: "path-parse",
+    reason: "SUBMISSION_PATH_INVALID",
     detail,
-  });
-}
-
-function problemFailure(detail) {
-  return new ReviewFailure({
-    stage: "problem-parse",
-    reason: "PROBLEM_DATA_INVALID",
-    detail,
-  });
-}
-
-function modelResponseFailure(field, issue) {
-  return new ReviewFailure({
-    stage: "model-response",
-    reason: "MODEL_RESPONSE_INVALID",
-    detail: `${modelResponseDetail} Diagnostic: field=${field}; issue=${issue}.`,
-  });
-}
-
-function resultValidationFailure() {
-  return new ReviewFailure({
-    stage: "result-validation",
-    reason: "REVIEW_RESULT_INVALID",
-    detail: resultValidationDetail,
   });
 }
 
 function parseSubmissionSolutionPath(path) {
   const match = solutionPathPattern.exec(path);
   if (!match) {
-    throw catalogFailure("제출 solution 경로를 해석하지 못했습니다.");
+    throw pathFailure("The submission solution path could not be parsed.");
   }
 
   const [, user, sourceKey, submissionKey, extension] = match;
@@ -79,276 +39,89 @@ function parseSubmissionSolutionPath(path) {
   return { path, user, sourceKey, submissionKey, filename, extension: extension.toLowerCase() };
 }
 
-function resolveCatalogProblem(path, catalog) {
-  const parsedPath = parseSubmissionSolutionPath(path);
-  const list = catalog?.lists?.find((entry) => entry.key === parsedPath.sourceKey);
-  if (!list) {
-    throw catalogFailure("제출 목록을 찾지 못했습니다.");
-  }
-
-  const item = list.items?.find((entry) => String(entry.submissionKey) === parsedPath.submissionKey);
-  if (!item) {
-    throw catalogFailure("제출 문제를 찾지 못했습니다.");
-  }
-
-  const problem = catalog?.problems?.find((entry) => entry.slug === item.slug);
-  if (!problem) {
-    throw catalogFailure("정식 문제 정보를 찾지 못했습니다.");
-  }
-
-  return { ...parsedPath, slug: item.slug, problem };
+function reviewFileKey(path) {
+  return createHash("sha256").update(String(path), "utf8").digest("hex");
 }
 
-function getLeetCodeLangSlug(extension) {
-  const langSlug = typeof extension === "string" ? leetCodeLangSlugs[extension.toLowerCase()] : undefined;
-  if (!langSlug) {
-    throw problemFailure("제출 언어를 LeetCode 공식 template에 매핑하지 못했습니다.");
-  }
-  return langSlug;
+function reviewFileMarker(path) {
+  return `<!-- leetdash-opencode-review-file:${reviewFileKey(path)} -->`;
 }
 
-function hasText(value) {
-  return typeof value === "string" && value.trim().length > 0;
+function reviewContentKey(source) {
+  return createHash("sha256").update(String(source), "utf8").digest("hex");
 }
 
-function normalizeQuestionData(rawQuestion, extension) {
-  const langSlug = getLeetCodeLangSlug(extension);
-  const content = rawQuestion?.content;
-  if (!hasText(content)) {
-    throw problemFailure("LeetCode 문제 본문이 비어 있습니다.");
-  }
-
-  const exampleTestcases = rawQuestion?.exampleTestcases;
-  if (!hasText(exampleTestcases)) {
-    throw problemFailure("LeetCode 예제 테스트 케이스가 비어 있습니다.");
-  }
-
-  let metadata;
-  try {
-    metadata = JSON.parse(rawQuestion?.metaData);
-  } catch {
-    throw problemFailure("LeetCode judge metadata가 유효하지 않습니다.");
-  }
-  if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") {
-    throw problemFailure("LeetCode judge metadata가 유효하지 않습니다.");
-  }
-
-  const snippet = Array.isArray(rawQuestion?.codeSnippets)
-    ? rawQuestion.codeSnippets.find((entry) => entry?.langSlug === langSlug)
-    : undefined;
-  if (!hasText(snippet?.code)) {
-    throw problemFailure("제출 언어의 LeetCode 공식 코드 template을 찾지 못했습니다.");
-  }
-
-  const topicTags = Array.isArray(rawQuestion?.topicTags)
-    ? rawQuestion.topicTags
-      .filter((tag) => typeof tag?.name === "string" && typeof tag?.slug === "string")
-      .map(({ name, slug }) => ({ name, slug }))
-    : [];
-
-  return { content, exampleTestcases, metadata, codeTemplate: snippet.code, topicTags };
+function reviewContentMarker(contentKey) {
+  if (!/^[a-f0-9]{64}$/.test(contentKey)) throw new TypeError("Invalid review content key.");
+  return `<!-- leetdash-opencode-review-content:${contentKey} -->`;
 }
 
-function buildReviewPrompt({ resolved, question, source }) {
-  return `You are a strict but narrowly scoped LeetCode submission judge.
+function parseManagedReviewMarker(body) {
+  if (typeof body !== "string") return undefined;
+  if (body === reviewSummaryMarker || body.startsWith(`${reviewSummaryMarker}\n`) || body.startsWith(`${reviewSummaryMarker}\r\n`)) {
+    return { kind: "summary" };
+  }
+  const [firstLine, secondLine] = body.split(/\r?\n/, 2);
+  const fileMatch = reviewFileMarkerPattern.exec(firstLine);
+  if (!fileMatch) return undefined;
+  const contentMatch = reviewContentMarkerPattern.exec(secondLine ?? "");
+  return {
+    kind: "file",
+    key: fileMatch[1],
+    ...(contentMatch ? { contentKey: contentMatch[1] } : {}),
+  };
+}
 
-Review exactly one submitted solution against the supplied problem statement, constraints, judge metadata, official language template, and examples. Determine whether the code is correct for every valid input and whether its worst-case time and space complexity fit the stated constraints.
+function buildReviewPrompt({ path, language, source }) {
+  return `You are performing an informational static review of one submitted source file.
 
-Return exactly one JSON object matching schema_version 1 below. Do not return Markdown, code fences, prose before or after the JSON, or additional keys.
+Use only the submission path, language, and code below. Correctness, expected behavior, platform contracts, input limits, and acceptable complexity cannot be inferred. Do not claim that the code is correct or incorrect, predict expected outputs, assume a required platform signature, or say whether the reported complexity fits unknown limits.
 
-Blocking policy:
-- FAIL only for an incorrect answer or missing edge case; a compile error or inevitable runtime error; non-termination; a violation of the platform/judge contract; or time/space complexity that exceeds the problem constraints.
-- Style, naming, readability, optional optimizations, and alternative algorithms are never blocking by themselves. Put them only in non_blocking_suggestions.
-- Do not assume unstated requirements. Judge using the supplied problem and metadata.
-- If verdict is FAIL, include at least one blocking finding. Give concrete evidence and, whenever applicable, a minimal counterexample with expected and actual behavior.
-- If verdict is PASS, correctness.status must be PASS, complexity.acceptable must be true, and blocking_findings must be empty.
-- correctness.status means end-to-end submission correctness, including compilation, runtime safety, termination, and platform/judge contract compliance. Every non-complexity blocking defect must set correctness.status to FAIL; complexity is the only independent blocking axis.
-- Echo submission_path exactly in path.
+Report only risks supported by evidence visible in the submitted code. An edge-case risk must name a boundary condition visible from the code and remain a possible risk, not a correctness verdict. Complexity must describe the code as written without judging whether it fits unknown limits.
+
+Return Markdown only. Do not return JSON, repeat the submitted code, or wrap the response in a code fence. 리뷰의 모든 설명과 제안은 자연스러운 한국어로 작성하세요. 코드 식별자, 경로, 언어 키워드, API 이름, Big-O 표기는 정확성을 위해 원문을 유지할 수 있습니다. 아래 섹션 제목을 정확히 이 순서로 사용하세요. 리뷰는 간결하게 작성하고 발견 사항이 없는 섹션에는 "제출 코드만으로 확인된 사항 없음."이라고 쓰세요.
+
+#### 요약
+짧은 문단 하나.
+
+#### 잠재적 위험
+- 소스 위치와 발생 조건을 포함한, 코드에서 직접 확인할 수 있는 잠재적 위험.
+
+#### 복잡도
+- 시간: 작성된 코드의 시간 복잡도
+- 공간: 작성된 코드의 보조 공간 복잡도
+
+#### 가독성
+- 소스 위치를 포함한 구체적인 가독성 개선 제안.
 
 SUBMISSION
-- path: ${resolved.path}
-- language: ${resolved.extension}
-
-PROBLEM IDENTITY
-- leetcode_id: ${resolved.problem.leetcodeId}
-- title_slug: ${resolved.slug}
-- title: ${resolved.problem.title}
-- difficulty: ${resolved.problem.difficulty}
-
-PROBLEM CONTENT, EXAMPLES, AND CONSTRAINTS
-${question.content}
-
-EXAMPLE TEST CASES
-${question.exampleTestcases}
-
-JUDGE METADATA
-${JSON.stringify(question.metadata, null, 2)}
-
-OFFICIAL ${resolved.extension.toUpperCase()} CODE TEMPLATE
-${question.codeTemplate}
-
-TOPIC TAGS
-${JSON.stringify(question.topicTags, null, 2)}
+- path: ${path}
+- language: ${language}
 
 SUBMITTED CODE
-${source}
-
-REQUIRED JSON SHAPE
-{
-  "schema_version": 1,
-  "verdict": "PASS | FAIL",
-  "path": "${resolved.path}",
-  "summary": "short verdict summary",
-  "correctness": {
-    "status": "PASS | FAIL",
-    "reason": "correctness reasoning tied to the problem contract"
-  },
-  "complexity": {
-    "time": "worst-case Big-O",
-    "space": "worst-case auxiliary-space Big-O",
-    "acceptable": true,
-    "reason": "comparison with the supplied constraints"
-  },
-  "blocking_findings": [
-    {
-      "category": "correctness | compile | runtime | termination | platform-contract | complexity",
-      "reason": "specific merge-blocking defect",
-      "evidence": "why the defect follows from the code and problem",
-      "counterexample": {
-        "input": "minimal failing input, or null when not applicable",
-        "expected": "expected behavior, or null when not applicable",
-        "actual": "actual behavior, or null when not applicable"
-      }
-    }
-  ],
-  "non_blocking_suggestions": [
-    {
-      "category": "style | readability | optimization | alternative",
-      "suggestion": "optional, non-blocking improvement"
-    }
-  ]
-}`;
+${source}`;
 }
 
-function isObject(value) {
-  return value !== null && !Array.isArray(value) && typeof value === "object";
-}
-
-function assertExactKeys(value, keys, field) {
-  if (!isObject(value)) throw modelResponseFailure(field, "object");
-  const actualKeys = Object.keys(value);
-  if (actualKeys.length !== keys.length || actualKeys.some((key) => !keys.includes(key))) {
-    throw modelResponseFailure(field, "object-shape");
+function sanitizeReviewMarkdown(value) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new ReviewFailure({
+      stage: "model-response",
+      reason: "MODEL_RESPONSE_INVALID",
+      detail: "OpenCode response is missing review Markdown.",
+    });
   }
-}
-
-function assertString(value, field) {
-  if (!hasText(value)) throw modelResponseFailure(field, "non-empty-string");
-}
-
-function assertEnum(value, allowed, field) {
-  if (!allowed.has(value)) throw modelResponseFailure(field, "enum");
-}
-
-function assertStringOrNull(value, field) {
-  if (value !== null && !hasText(value)) throw modelResponseFailure(field, "string-or-null");
-}
-
-function assertCounterexample(value) {
-  assertExactKeys(value, ["input", "expected", "actual"], "blocking_findings[].counterexample");
-  assertStringOrNull(value.input, "blocking_findings[].counterexample.input");
-  assertStringOrNull(value.expected, "blocking_findings[].counterexample.expected");
-  assertStringOrNull(value.actual, "blocking_findings[].counterexample.actual");
-  const values = [value.input, value.expected, value.actual];
-  if (values.some((item) => item === null) && values.some((item) => item !== null)) {
-    throw modelResponseFailure("blocking_findings[].counterexample", "all-null-or-all-text");
-  }
-}
-
-function assertBlockingFinding(value) {
-  assertExactKeys(value, ["category", "reason", "evidence", "counterexample"], "blocking_findings[]");
-  assertEnum(value.category, blockingCategories, "blocking_findings[].category");
-  assertString(value.reason, "blocking_findings[].reason");
-  assertString(value.evidence, "blocking_findings[].evidence");
-  assertCounterexample(value.counterexample);
-}
-
-function assertSuggestion(value) {
-  assertExactKeys(value, ["category", "suggestion"], "non_blocking_suggestions[]");
-  assertEnum(value.category, suggestionCategories, "non_blocking_suggestions[].category");
-  assertString(value.suggestion, "non_blocking_suggestions[].suggestion");
-}
-
-function assertArray(value, validator, field) {
-  if (!Array.isArray(value)) throw modelResponseFailure(field, "array");
-  value.forEach(validator);
-}
-
-function deepFreeze(value) {
-  if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.values(value).forEach(deepFreeze);
-    Object.freeze(value);
-  }
-  return value;
-}
-
-function parseReviewResult(raw, expectedPath) {
-  let result;
-  try {
-    result = JSON.parse(raw);
-  } catch {
-    throw modelResponseFailure("response", "json-parse");
-  }
-
-  assertExactKeys(result, [
-    "schema_version",
-    "verdict",
-    "path",
-    "summary",
-    "correctness",
-    "complexity",
-    "blocking_findings",
-    "non_blocking_suggestions",
-  ], "response");
-  if (result.schema_version !== 1) throw modelResponseFailure("schema_version", "value");
-  assertEnum(result.verdict, new Set(["PASS", "FAIL"]), "verdict");
-  assertString(result.path, "path");
-  assertString(result.summary, "summary");
-
-  assertExactKeys(result.correctness, ["status", "reason"], "correctness");
-  assertEnum(result.correctness.status, new Set(["PASS", "FAIL"]), "correctness.status");
-  assertString(result.correctness.reason, "correctness.reason");
-
-  assertExactKeys(result.complexity, ["time", "space", "acceptable", "reason"], "complexity");
-  assertString(result.complexity.time, "complexity.time");
-  assertString(result.complexity.space, "complexity.space");
-  if (typeof result.complexity.acceptable !== "boolean") {
-    throw modelResponseFailure("complexity.acceptable", "boolean");
-  }
-  assertString(result.complexity.reason, "complexity.reason");
-
-  assertArray(result.blocking_findings, assertBlockingFinding, "blocking_findings");
-  assertArray(result.non_blocking_suggestions, assertSuggestion, "non_blocking_suggestions");
-  const hasNonComplexityFinding = result.blocking_findings.some((finding) => finding.category !== "complexity");
-  const hasComplexityFinding = result.blocking_findings.some((finding) => finding.category === "complexity");
-
-  if (
-    result.path !== expectedPath
-    || (result.verdict === "PASS" && (
-      result.correctness.status !== "PASS"
-      || result.blocking_findings.length > 0
-      || !result.complexity.acceptable
-    ))
-    || (result.verdict === "FAIL" && (
-      result.blocking_findings.length === 0
-      || (hasNonComplexityFinding && result.correctness.status !== "FAIL")
-      || (hasComplexityFinding && result.complexity.acceptable)
-    ))
-  ) {
-    throw resultValidationFailure();
-  }
-
-  return deepFreeze(result);
+  return value
+    .trim()
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/g, " ")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/@/g, "&#64;")
+    .replace(/\]\s*\(/g, "\\](")
+    .replace(/\]\s*\[/g, "\\][")
+    .replace(/\b(https?|mailto):/gi, "$1&#58;")
+    .replace(/\bwww\./gi, "www&#46;");
 }
 
 function markdownText(value) {
@@ -360,81 +133,161 @@ function markdownText(value) {
     .replace(/\|/g, "\\|");
 }
 
-function renderCounterexample(counterexample) {
-  if (counterexample.input === null) return [];
+function limitComment(markdown) {
+  if (markdown.length <= maxManagedCommentLength) return markdown;
+  return `${markdown.slice(0, maxManagedCommentLength - truncationNotice.length)}${truncationNotice}`;
+}
+
+function buildMascotUrl({ serverUrl, repository, baseSha }) {
+  let parsedServerUrl;
+  try {
+    parsedServerUrl = new URL(serverUrl);
+  } catch {
+    parsedServerUrl = undefined;
+  }
+  if (
+    !parsedServerUrl
+    || parsedServerUrl.protocol !== "https:"
+    || parsedServerUrl.username
+    || parsedServerUrl.password
+    || typeof repository !== "string"
+    || !/^[^/\s]+\/[^/\s]+$/.test(repository)
+    || typeof baseSha !== "string"
+    || !/^[a-f0-9]{7,64}$/i.test(baseSha)
+  ) {
+    throw new ReviewFailure({
+      stage: "catalog-resolve",
+      reason: "CATALOG_MAPPING_FAILED",
+      detail: "Review branding configuration is invalid.",
+    });
+  }
+  return `${parsedServerUrl.origin}${parsedServerUrl.pathname.replace(/\/$/, "")}/${repository}/raw/${encodeURIComponent(baseSha)}/public/chalsakbot.png`;
+}
+
+function buildSourcePermalink({ serverUrl, repository, headSha, path }) {
+  let parsedServerUrl;
+  try {
+    parsedServerUrl = new URL(serverUrl);
+  } catch {
+    parsedServerUrl = undefined;
+  }
+  const segments = typeof path === "string" ? path.split("/") : [];
+  if (
+    !parsedServerUrl
+    || parsedServerUrl.protocol !== "https:"
+    || parsedServerUrl.username
+    || parsedServerUrl.password
+    || typeof repository !== "string"
+    || !/^[^/\s]+\/[^/\s]+$/.test(repository)
+    || typeof headSha !== "string"
+    || !/^[a-f0-9]{7,64}$/i.test(headSha)
+    || segments.length === 0
+    || segments.some((segment) => !segment || segment === "." || segment === ".." || segment.includes("\\"))
+  ) {
+    throw new ReviewFailure({
+      stage: "catalog-resolve",
+      reason: "CATALOG_MAPPING_FAILED",
+      detail: "Review source link configuration is invalid.",
+    });
+  }
+  const serverPrefix = `${parsedServerUrl.origin}${parsedServerUrl.pathname.replace(/\/$/, "")}`;
+  const encodedPath = segments.map((segment) => encodeURIComponent(segment)).join("/");
+  return `${serverPrefix}/${repository}/blob/${encodeURIComponent(headSha)}/${encodedPath}`;
+}
+
+function brandedHeader({ mascotUrl, title }) {
   return [
-    `  - Input: ${markdownText(counterexample.input)}`,
-    `  - Expected: ${markdownText(counterexample.expected)}`,
-    `  - Actual: ${markdownText(counterexample.actual)}`,
+    `<img src="${markdownText(mascotUrl)}" width="72" alt="찰싹봇 캐릭터" align="left">`,
+    `## ${title}`,
+    "",
   ];
 }
 
-function renderReviewComment({ headSha, results, runUrl }) {
+function warningLines(failure) {
   const lines = [
-    "<!-- leetdash-opencode-review -->",
-    "## OpenCode submission review",
-    `Commit: ${markdownText(headSha)}`,
-    `Workflow URL: ${markdownText(runUrl)}`,
+    `단계: ${markdownText(failure.stage)}`,
+    `사유: ${markdownText(failure.reason)}`,
+    `상세: ${markdownText(failure.detail)}`,
+    `재시도 가능: ${failure.retryable ? "예" : "아니요"}`,
   ];
-
-  results.forEach((result) => {
-    lines.push(
-      "",
-      `### ${markdownText(result.path)}`,
-      `Verdict: ${markdownText(result.verdict)}`,
-      `Summary: ${markdownText(result.summary)}`,
-      `Correctness: ${markdownText(result.correctness.status)} — ${markdownText(result.correctness.reason)}`,
-      `Time: ${markdownText(result.complexity.time)}`,
-      `Space: ${markdownText(result.complexity.space)}`,
-      `Complexity acceptable: ${result.complexity.acceptable ? "yes" : "no"} — ${markdownText(result.complexity.reason)}`,
-    );
-
-    if (result.blocking_findings.length > 0) {
-      lines.push("Blocking findings:");
-      result.blocking_findings.forEach((finding) => {
-        lines.push(
-          `- ${markdownText(finding.category)}: ${markdownText(finding.reason)}`,
-          `  - Evidence: ${markdownText(finding.evidence)}`,
-          ...renderCounterexample(finding.counterexample),
-        );
-      });
-    }
-
-    if (result.non_blocking_suggestions.length > 0) {
-      lines.push("Non-blocking suggestions:");
-      result.non_blocking_suggestions.forEach((suggestion) => {
-        lines.push(`- ${markdownText(suggestion.category)}: ${markdownText(suggestion.suggestion)}`);
-      });
-    }
-  });
-
-  return lines.join("\n");
+  if (failure.httpStatus !== undefined) lines.push(`HTTP 상태: ${markdownText(failure.httpStatus)}`);
+  if (failure.requestId !== undefined) lines.push(`요청 ID: ${markdownText(failure.requestId)}`);
+  return lines;
 }
 
-function renderInfrastructureFailure({ headSha, failure, runUrl }) {
-  const lines = [
-    "<!-- leetdash-opencode-review -->",
-    "## OpenCode review infrastructure failure (issue #33)",
-    `Commit: ${markdownText(headSha)}`,
-    `Stage: ${markdownText(failure.stage)}`,
-    `Reason: ${markdownText(failure.reason)}`,
-    `Detail: ${markdownText(failure.detail)}`,
-    `Retryable: ${failure.retryable ? "yes" : "no"}`,
-  ];
-  if (failure.httpStatus !== undefined) lines.push(`HTTP status: ${markdownText(failure.httpStatus)}`);
-  if (failure.requestId !== undefined) lines.push(`Request ID: ${markdownText(failure.requestId)}`);
-  lines.push(`Workflow URL: ${markdownText(runUrl)}`);
-  return lines.join("\n");
+function renderReviewFileComment({ path, sourceUrl, contentKey, headSha, runUrl, mascotUrl, markdown }) {
+  return limitComment([
+    reviewFileMarker(path),
+    reviewContentMarker(contentKey),
+    ...brandedHeader({ mascotUrl, title: "찰싹봇의 코드 리뷰" }),
+    `파일: [${markdownText(path)}](${markdownText(sourceUrl)})`,
+    `커밋: ${markdownText(headSha)}`,
+    `워크플로: ${markdownText(runUrl)}`,
+    "",
+    markdown,
+  ].join("\n"));
+}
+
+function renderReviewFileWarning({ path, sourceUrl, headSha, runUrl, mascotUrl, failure }) {
+  return limitComment([
+    reviewFileMarker(path),
+    ...brandedHeader({ mascotUrl, title: "찰싹봇 리뷰 경고" }),
+    `파일: [${markdownText(path)}](${markdownText(sourceUrl)})`,
+    `커밋: ${markdownText(headSha)}`,
+    ...warningLines(failure),
+    `워크플로: ${markdownText(runUrl)}`,
+  ].join("\n"));
+}
+
+function renderReviewSummary({
+  headSha,
+  runUrl,
+  mascotUrl,
+  reviewedCount,
+  reusedCount = 0,
+  warningCount,
+  deliveryFailureCount,
+  message,
+}) {
+  return limitComment([
+    reviewSummaryMarker,
+    ...brandedHeader({ mascotUrl, title: "찰싹봇 리뷰 요약" }),
+    `커밋: ${markdownText(headSha)}`,
+    ...(message ? [markdownText(message)] : [
+      `리뷰 완료: ${reviewedCount}개`,
+      `리뷰 유지: ${reusedCount}개`,
+      `리뷰 경고: ${warningCount}개`,
+      `댓글 전달 실패: ${deliveryFailureCount}개`,
+    ]),
+    `워크플로: ${markdownText(runUrl)}`,
+  ].join("\n"));
+}
+
+function renderReviewWarning({ headSha, failure, runUrl, mascotUrl }) {
+  return limitComment([
+    reviewSummaryMarker,
+    ...brandedHeader({ mascotUrl, title: "찰싹봇 리뷰 경고" }),
+    `커밋: ${markdownText(headSha)}`,
+    ...warningLines(failure),
+    `워크플로: ${markdownText(runUrl)}`,
+  ].join("\n"));
 }
 
 export {
   ReviewFailure,
+  buildMascotUrl,
   buildReviewPrompt,
-  getLeetCodeLangSlug,
-  normalizeQuestionData,
-  parseReviewResult,
+  buildSourcePermalink,
+  parseManagedReviewMarker,
   parseSubmissionSolutionPath,
-  renderInfrastructureFailure,
-  renderReviewComment,
-  resolveCatalogProblem,
+  renderReviewFileComment,
+  renderReviewFileWarning,
+  renderReviewSummary,
+  renderReviewWarning,
+  reviewContentKey,
+  reviewContentMarker,
+  reviewFileKey,
+  reviewFileMarker,
+  reviewSummaryMarker,
+  sanitizeReviewMarkdown,
 };

@@ -4,14 +4,19 @@ import { fileURLToPath } from "node:url";
 
 import {
   ReviewFailure,
+  buildMascotUrl,
   buildReviewPrompt,
-  normalizeQuestionData,
-  parseReviewResult,
-  renderInfrastructureFailure,
-  resolveCatalogProblem,
-  renderReviewComment,
+  buildSourcePermalink,
+  parseSubmissionSolutionPath,
+  renderReviewFileComment,
+  renderReviewFileWarning,
+  renderReviewSummary,
+  renderReviewWarning,
+  reviewContentKey,
+  reviewFileKey,
+  sanitizeReviewMarkdown,
 } from "./opencode-review-core.mjs";
-import { GitHubReviewClient, LeetCodeClient, OpenCodeClient } from "./opencode-review-clients.mjs";
+import { GitHubReviewClient, OpenCodeClient } from "./opencode-review-clients.mjs";
 import {
   hasCompletePullRequestFileList,
   isParticipantSubmissionPath,
@@ -25,11 +30,10 @@ const embeddedSourceRedactionMinimumLength = 16;
 
 const safeFailures = Object.freeze({
   "catalog-resolve": ["CATALOG_MAPPING_FAILED", "Submission review paths could not be resolved."],
-  "problem-fetch": ["PROBLEM_FETCH_FAILED", "LeetCode question request failed."],
-  "problem-parse": ["PROBLEM_DATA_INVALID", "LeetCode question data is invalid."],
+  "path-parse": ["SUBMISSION_PATH_INVALID", "The submission solution path could not be parsed."],
+  "source-read": ["SOURCE_READ_FAILED", "Submission source is unavailable."],
   "model-request": ["MODEL_REQUEST_FAILED", "OpenCode review request failed."],
   "model-response": ["MODEL_RESPONSE_INVALID", "OpenCode review response is invalid."],
-  "result-validation": ["REVIEW_RESULT_INVALID", "OpenCode review result is invalid."],
 });
 
 function isReviewableSolution(file) {
@@ -49,8 +53,8 @@ function failureForStage(stage) {
 
 function sourceReadFailure() {
   return new ReviewFailure({
-    stage: "catalog-resolve",
-    reason: "CATALOG_MAPPING_FAILED",
+    stage: "source-read",
+    reason: "SOURCE_READ_FAILED",
     detail: "Submission source is unavailable.",
   });
 }
@@ -166,16 +170,6 @@ async function defaultUsersLoader() {
   return JSON.parse(await readFile(path.join(process.cwd(), "data", "users.json"), "utf8"));
 }
 
-function noSolutionsMarkdown({ headSha, runUrl }) {
-  return [
-    "<!-- leetdash-opencode-review -->",
-    "## OpenCode submission review",
-    `Commit: ${headSha}`,
-    "No changed solution.* files require review.",
-    `Workflow URL: ${runUrl}`,
-  ].join("\n");
-}
-
 function notApplicableMarkdown() {
   return "OpenCode submission review is not applicable to this pull request.";
 }
@@ -193,47 +187,75 @@ function redactModelText(value, source) {
   if (typeof source !== "string" || source.trim().length === 0) return value;
   if (value === source) return "[submitted source redacted]";
   if (source.trim().length < embeddedSourceRedactionMinimumLength) return value;
+  const canonicalLines = (text) => text
+    .replace(/\r\n?/g, "\n")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+    .split("\n")
+    .map((rawLine) => {
+      let line = rawLine.trim();
+      if (!line || /^```/.test(line)) return "";
+      let previous;
+      do {
+        previous = line;
+        line = line
+          .replace(/^>\s*/, "")
+          .replace(/^[-*+]\s+/, "")
+          .replace(/^\d+\s*(?:[|:.]|\))\s*/, "")
+          .trimStart();
+      } while (line !== previous);
+      return line.replace(/\s+/g, " ").trim();
+    })
+    .filter(Boolean);
+  const sourceLines = canonicalLines(source);
+  const valueLines = canonicalLines(value);
+  let sourceIndex = 0;
+  for (const line of valueLines) {
+    if (line === sourceLines[sourceIndex]) sourceIndex += 1;
+    if (sourceIndex === sourceLines.length) break;
+  }
+  if (sourceLines.length > 0 && sourceIndex === sourceLines.length) {
+    return "[submitted source redacted]";
+  }
   return value.split(source).join("[submitted source redacted]");
 }
 
-function redactReviewResult(result, source) {
-  return {
-    ...result,
-    summary: redactModelText(result.summary, source),
-    correctness: {
-      ...result.correctness,
-      reason: redactModelText(result.correctness.reason, source),
-    },
-    complexity: {
-      ...result.complexity,
-      time: redactModelText(result.complexity.time, source),
-      space: redactModelText(result.complexity.space, source),
-      reason: redactModelText(result.complexity.reason, source),
-    },
-    blocking_findings: result.blocking_findings.map((finding) => ({
-      ...finding,
-      reason: redactModelText(finding.reason, source),
-      evidence: redactModelText(finding.evidence, source),
-      counterexample: {
-        input: redactModelText(finding.counterexample.input, source),
-        expected: redactModelText(finding.counterexample.expected, source),
-        actual: redactModelText(finding.counterexample.actual, source),
-      },
-    })),
-    non_blocking_suggestions: result.non_blocking_suggestions.map((suggestion) => ({
-      ...suggestion,
-      suggestion: redactModelText(suggestion.suggestion, source),
-    })),
-  };
+async function reviewOneFile({ file, readSource, openCodeClient, model, apiKey, cachedContentKey }) {
+  let stage = "path-parse";
+  let filePath = file.path;
+  try {
+    const parsed = parseSubmissionSolutionPath(file.path);
+    filePath = parsed.path;
+    stage = "source-read";
+    const source = await readSource(parsed.path);
+    const contentKey = reviewContentKey(source);
+    if (cachedContentKey === contentKey) {
+      return { path: filePath, status: "reused", contentKey };
+    }
+    const prompt = buildReviewPrompt({ path: parsed.path, language: parsed.extension, source });
+    stage = "model-request";
+    const raw = await openCodeClient.review({ model, apiKey, prompt });
+    stage = "model-response";
+    return {
+      path: filePath,
+      status: "reviewed",
+      contentKey,
+      markdown: sanitizeReviewMarkdown(redactModelText(raw, source)),
+    };
+  } catch (error) {
+    return {
+      path: filePath,
+      status: "warning",
+      failure: error instanceof ReviewFailure ? error : failureForStage(stage),
+    };
+  }
 }
 
 async function reviewPullRequest({
   githubClient,
-  leetcodeClient,
   openCodeClient,
   readFile: readSource = defaultSourceReader,
-  catalog,
-  loadCatalog = defaultCatalogLoader,
   changedFiles,
   loadChangedFiles = async () => [],
   loadReviewScope,
@@ -242,6 +264,9 @@ async function reviewPullRequest({
   runUrl,
   apiKey,
   model,
+  mascotUrl,
+  serverUrl,
+  headRepository,
   summaryPath,
   submissionOnly,
 }) {
@@ -250,14 +275,29 @@ async function reviewPullRequest({
     title: "OpenCode review started",
     summary: "Submission review is running.",
   });
-  const questions = new Map();
-  const reviewedResults = [];
   const results = [];
   let stage = "catalog-resolve";
   let failure;
   let markdown;
   let conclusion = "success";
   let activeSubmissionOnly = false;
+  let activeHeadRepository = headRepository;
+  let trustedScopeValidated = typeof submissionOnly === "boolean";
+  let managedComments = [];
+  let managedCommentsLoaded = false;
+  let commentDiscoveryAvailable = true;
+  let deliveryFailureCount = 0;
+
+  const loadManagedComments = async () => {
+    if (managedCommentsLoaded) return;
+    managedCommentsLoaded = true;
+    try {
+      managedComments = await githubClient.listManagedReviewComments(pullNumber);
+    } catch {
+      managedComments = [];
+      commentDiscoveryAvailable = false;
+    }
+  };
 
   try {
     let activeChangedFiles = changedFiles;
@@ -275,8 +315,10 @@ async function reviewPullRequest({
       if (!scope || typeof scope.submissionOnly !== "boolean" || !Array.isArray(scope.changedFiles)) {
         throw changedFilesLoadFailure();
       }
+      trustedScopeValidated = true;
       activeSubmissionOnly = scope.submissionOnly;
       activeChangedFiles = scope.changedFiles;
+      if (typeof scope.headRepository === "string") activeHeadRepository = scope.headRepository;
     }
 
     if (!activeSubmissionOnly) {
@@ -296,42 +338,113 @@ async function reviewPullRequest({
         }
         return isReviewableSolution(file);
       });
-      if (paths.length === 0) {
-        markdown = noSolutionsMarkdown({ headSha, runUrl });
-      } else {
-        stage = "catalog-resolve";
-        const activeCatalog = catalog ?? await loadCatalog();
-        for (const file of paths) {
-          stage = "catalog-resolve";
-          const resolved = resolveCatalogProblem(file.path, activeCatalog);
-          const source = await readSource(resolved.path);
-          stage = "problem-fetch";
-          if (!questions.has(resolved.slug)) questions.set(resolved.slug, leetcodeClient.getQuestion(resolved.slug));
-          const rawQuestion = await questions.get(resolved.slug);
-          stage = "problem-parse";
-          const question = normalizeQuestionData(rawQuestion, resolved.extension);
-          const prompt = buildReviewPrompt({ resolved, question, source });
-          stage = "model-request";
-          const raw = await openCodeClient.review({ model, apiKey, prompt });
-          stage = "model-response";
-          reviewedResults.push({ result: parseReviewResult(raw, resolved.path), source });
+      await loadManagedComments();
+      const summaryComment = managedComments.find((comment) => comment.kind === "summary");
+      const fileComments = new Map(
+        managedComments
+          .filter((comment) => comment.kind === "file")
+          .map((comment) => [comment.key, comment]),
+      );
+
+      for (const file of paths) {
+        const fileComment = fileComments.get(reviewFileKey(file.path));
+        const result = await reviewOneFile({
+          file,
+          readSource,
+          openCodeClient,
+          model,
+          apiKey,
+          cachedContentKey: fileComment?.contentKey,
+        });
+        results.push(result);
+        if (result.status === "reused") continue;
+        let sourceUrl;
+        try {
+          sourceUrl = buildSourcePermalink({
+            serverUrl,
+            repository: activeHeadRepository,
+            headSha,
+            path: result.path,
+          });
+        } catch (error) {
+          result.status = "warning";
+          result.failure = error instanceof ReviewFailure ? error : failureForStage("catalog-resolve");
+          delete result.contentKey;
+          delete result.markdown;
         }
-        results.push(...reviewedResults.map(({ result, source }) => redactReviewResult(result, source)));
-        conclusion = results.every((result) => result.verdict === "PASS") ? "success" : "failure";
-        markdown = renderReviewComment({ headSha, results, runUrl });
+        const body = result.status === "reviewed"
+          ? renderReviewFileComment({ path: result.path, sourceUrl, contentKey: result.contentKey, headSha, runUrl, mascotUrl, markdown: result.markdown })
+          : renderReviewFileWarning({ path: result.path, sourceUrl, headSha, runUrl, mascotUrl, failure: result.failure });
+        if (!commentDiscoveryAvailable) {
+          deliveryFailureCount += 1;
+          continue;
+        }
+        try {
+          await githubClient.upsertReviewComment({
+            pullNumber,
+            commentId: fileComment?.id,
+            body,
+          });
+        } catch {
+          deliveryFailureCount += 1;
+        }
+      }
+
+      if (commentDiscoveryAvailable) {
+        const currentKeys = new Set(paths.map((file) => reviewFileKey(file.path)));
+        for (const comment of managedComments) {
+          if (comment.kind !== "file" || currentKeys.has(comment.key)) continue;
+          try {
+            await githubClient.deleteReviewComment(comment.id);
+          } catch {
+            deliveryFailureCount += 1;
+          }
+        }
+      }
+
+      const reviewedCount = results.filter((result) => result.status === "reviewed").length;
+      const reusedCount = results.filter((result) => result.status === "reused").length;
+      const warningCount = results.filter((result) => result.status === "warning").length;
+      const summaryArgs = {
+        headSha,
+        runUrl,
+        mascotUrl,
+        reviewedCount,
+        reusedCount,
+        warningCount,
+        deliveryFailureCount,
+        ...(paths.length === 0 ? { message: "변경된 solution.* 파일이 없어 리뷰를 생략했습니다." } : {}),
+      };
+      markdown = renderReviewSummary(summaryArgs);
+      if (commentDiscoveryAvailable) {
+        try {
+          await githubClient.upsertReviewComment({ pullNumber, commentId: summaryComment?.id, body: markdown });
+        } catch {
+          deliveryFailureCount += 1;
+          markdown = renderReviewSummary({ ...summaryArgs, deliveryFailureCount });
+        }
+      } else {
+        deliveryFailureCount += 1;
+        markdown = renderReviewSummary({ ...summaryArgs, deliveryFailureCount });
       }
     }
   } catch (error) {
     failure = error instanceof ReviewFailure ? error : failureForStage(stage);
-    conclusion = "failure";
-    markdown = renderInfrastructureFailure({ headSha, failure, runUrl });
+    conclusion = trustedScopeValidated ? "success" : "failure";
+    markdown = renderReviewWarning({ headSha, failure, runUrl, mascotUrl });
   }
 
   let summary = markdown;
-  if (activeSubmissionOnly || failure) {
-    try {
-      await githubClient.upsertReviewComment({ pullNumber, body: markdown });
-    } catch {
+  if (failure) {
+    await loadManagedComments();
+    if (commentDiscoveryAvailable) {
+      const summaryComment = managedComments.find((comment) => comment.kind === "summary");
+      try {
+        await githubClient.upsertReviewComment({ pullNumber, commentId: summaryComment?.id, body: markdown });
+      } catch {
+        summary = `${markdown}\n\n${deliveryDiagnostic}`;
+      }
+    } else {
       summary = `${markdown}\n\n${deliveryDiagnostic}`;
     }
   }
@@ -346,7 +459,14 @@ async function reviewPullRequest({
     title: conclusion === "success" ? "OpenCode review passed" : "OpenCode review failed",
     summary,
   });
-  return { results, conclusion, markdown, ...(failure ? { failure } : {}) };
+  return {
+    results,
+    failures: results.filter((result) => result.status === "warning").map((result) => result.failure),
+    deliveryFailureCount,
+    conclusion,
+    markdown,
+    ...(failure ? { failure } : {}),
+  };
 }
 
 function parseArgs(argv) {
@@ -373,6 +493,7 @@ function requiredConfiguration(args, env) {
   if (!args.head) missing.push("--head");
   if (!env.GITHUB_SERVER_URL) missing.push("GITHUB_SERVER_URL");
   if (!env.GITHUB_RUN_ID) missing.push("GITHUB_RUN_ID");
+  if (!/^[1-9]\d*$/.test(env.GITHUB_RUN_ATTEMPT ?? "")) missing.push("GITHUB_RUN_ATTEMPT");
   return missing;
 }
 
@@ -391,7 +512,12 @@ async function main(options = {}) {
     return { exitCode: 1 };
   }
 
-  const runUrl = `${env.GITHUB_SERVER_URL.replace(/\/$/, "")}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
+  const runUrl = `${env.GITHUB_SERVER_URL.replace(/\/$/, "")}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}?attempt=${env.GITHUB_RUN_ATTEMPT}`;
+  const mascotUrl = options.mascotUrl ?? buildMascotUrl({
+    serverUrl: env.GITHUB_SERVER_URL,
+    repository: env.GITHUB_REPOSITORY,
+    baseSha: args.base,
+  });
   const githubClient = options.githubClient ?? new GitHubReviewClient({ repository: env.GITHUB_REPOSITORY, token: env.GITHUB_TOKEN });
   let trustedCatalog = options.catalog;
   let trustedUsers = options.users;
@@ -417,26 +543,59 @@ async function main(options = {}) {
     if (typeof scope?.headRepository === "string") trustedHeadRepository = scope.headRepository;
     return scope;
   };
-  const result = await reviewPullRequest({
+  const reviewOptions = {
     githubClient,
-    leetcodeClient: options.leetcodeClient ?? new LeetCodeClient(),
     openCodeClient: options.openCodeClient ?? new OpenCodeClient(),
     readFile: options.readFile ?? ((filePath) => githubClient.getFileContent({
       path: filePath,
       ref: args.head,
       repository: trustedHeadRepository,
     })),
-    catalog: options.catalog,
-    loadCatalog,
     loadReviewScope,
     headSha: args.head,
     pullNumber: Number(args.pullNumber),
     runUrl,
     apiKey: env.OPENCODE_API_KEY,
     model: env.OPENCODE_REVIEW_MODEL,
+    mascotUrl,
+    serverUrl: env.GITHUB_SERVER_URL,
+    headRepository: trustedHeadRepository,
     summaryPath: options.summaryPath ?? env.GITHUB_STEP_SUMMARY,
-  });
-  return { exitCode: result.conclusion === "failure" ? 1 : 0, result };
+  };
+  try {
+    await githubClient.setCommitStatus({
+      sha: args.head,
+      state: "pending",
+      description: "OpenCode review is running.",
+      targetUrl: runUrl,
+    });
+    const result = await reviewPullRequest(reviewOptions);
+    const passed = (
+      result.conclusion === "success"
+      && result.failures.length === 0
+      && result.deliveryFailureCount === 0
+      && !result.failure
+    );
+    await githubClient.setCommitStatus({
+      sha: args.head,
+      state: passed ? "success" : "failure",
+      description: passed ? "OpenCode review passed." : "OpenCode review failed.",
+      targetUrl: runUrl,
+    });
+    return { exitCode: passed ? 0 : 1, result };
+  } catch (error) {
+    try {
+      await githubClient.setCommitStatus({
+        sha: args.head,
+        state: "failure",
+        description: "OpenCode review failed.",
+        targetUrl: runUrl,
+      });
+    } catch {
+      // Preserve the original review failure.
+    }
+    throw error;
+  }
 }
 
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
