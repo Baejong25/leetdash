@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react";
 import { CatalogProblemList } from "@/app/components/catalog-problem-list";
 import { difficultyLabel, formatDate, statusLabel } from "@/lib/format";
 import { formatCatalogListTitle, formatCatalogSection, formatProblemTitle } from "@/lib/i18n";
-import type { CatalogProblem } from "@/lib/catalog";
+import type { CatalogProblem, CatalogProvider } from "@/lib/catalog";
 import type { Submission } from "@/lib/types";
 
 type ListItem = {
@@ -51,28 +51,59 @@ const providerLabels = {
   swea: "SWEA",
 } as const;
 
-const difficultyOptions = [
-  { value: "all", label: "전체" },
-  { value: "easy", label: "쉬움" },
-  { value: "medium", label: "보통" },
-  { value: "hard", label: "어려움" },
-] as const;
-
 const statusOptions = [
   { value: "all", label: "전체" },
   { value: "SOLVED", label: "풀이 완료" },
-  { value: "REVIEWING", label: "검토 중" },
-  { value: "SKIPPED", label: "건너뜀" },
   { value: "UNSOLVED", label: "시작 전" },
 ] as const;
 
+const difficultyOptionsByProvider: Record<CatalogProvider, { value: string; label: string }[]> = {
+  leetcode: [
+    { value: "all", label: "전체" },
+    { value: "easy", label: "쉬움" },
+    { value: "medium", label: "보통" },
+    { value: "hard", label: "어려움" },
+  ],
+  swea: [
+    { value: "all", label: "전체" },
+    { value: "D1", label: "D1" },
+    { value: "D2", label: "D2" },
+    { value: "D3", label: "D3" },
+    { value: "D4", label: "D4" },
+    { value: "D5", label: "D5" },
+    { value: "D6", label: "D6" },
+    { value: "D7", label: "D7" },
+    { value: "D8", label: "D8" },
+  ],
+  programmers: [
+    { value: "all", label: "전체" },
+    { value: "level-0", label: "Level 0" },
+    { value: "level-1", label: "Level 1" },
+    { value: "level-2", label: "Level 2" },
+    { value: "level-3", label: "Level 3" },
+    { value: "level-4", label: "Level 4" },
+    { value: "level-5", label: "Level 5" },
+  ],
+};
+
+function getListProvider(items: ListItem[]): CatalogProvider {
+  return items[0]?.problem?.provider ?? "leetcode";
+}
+
 export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }: Props) {
-  const [difficultyFilter, setDifficultyFilter] = useState("all");
+  const [difficultyFilters, setDifficultyFilters] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const hasActiveFilter = difficultyFilter !== "all" || statusFilter !== "all";
+  const hasActiveFilter =
+    Object.values(difficultyFilters).some((v) => v !== "all") || statusFilter !== "all";
 
-  function matchesFilters(item: ListItem) {
+  function setDifficultyFilter(listKey: string, value: string) {
+    setDifficultyFilters((prev) => ({ ...prev, [listKey]: value }));
+  }
+
+  function matchesFilters(item: ListItem, listKey: string) {
+    const difficultyFilter = difficultyFilters[listKey] ?? "all";
+
     if (difficultyFilter !== "all" && item.problem.difficulty !== difficultyFilter) {
       return false;
     }
@@ -92,18 +123,6 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }
     <>
       <div className="filter-bar">
         <div className="viewer-control">
-          <label className="filter-label" htmlFor="difficulty-filter">
-            난이도
-          </label>
-          <select id="difficulty-filter" value={difficultyFilter} onChange={(e) => setDifficultyFilter(e.target.value)}>
-            {difficultyOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="viewer-control">
           <label className="filter-label" htmlFor="status-filter">
             상태
           </label>
@@ -116,14 +135,17 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }
           </select>
         </div>
         {hasActiveFilter ? (
-          <button className="button" type="button" onClick={() => { setDifficultyFilter("all"); setStatusFilter("all"); }}>
+          <button className="button" type="button" onClick={() => { setDifficultyFilters({}); setStatusFilter("all"); }}>
             초기화
           </button>
         ) : null}
       </div>
 
       {lists.map((list) => {
-        const filteredItems = hasActiveFilter ? list.items.filter(matchesFilters) : list.items;
+        const provider = getListProvider(list.items);
+        const difficultyOptions = difficultyOptionsByProvider[provider];
+        const listDifficulty = difficultyFilters[list.key] ?? "all";
+        const filteredItems = hasActiveFilter ? list.items.filter((item) => matchesFilters(item, list.key)) : list.items;
         const subtitleSuffix =
           hasActiveFilter && filteredItems.length !== list.items.length
             ? ` · 필터 ${filteredItems.length}개`
@@ -135,6 +157,24 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }
             title={formatCatalogListTitle(list.title)}
             subtitle={`풀이 완료 ${list.progress.solved}개, 검토 중 ${list.progress.reviewing}개, 건너뜀 ${list.progress.skipped}개${subtitleSuffix}`}
           >
+            <div className="filter-bar">
+              <div className="viewer-control">
+                <label className="filter-label" htmlFor={`difficulty-filter-${list.key}`}>
+                  난이도
+                </label>
+                <select
+                  id={`difficulty-filter-${list.key}`}
+                  value={listDifficulty}
+                  onChange={(e) => setDifficultyFilter(list.key, e.target.value)}
+                >
+                  {difficultyOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             {filteredItems.length === 0 ? (
               <div className="empty">조건에 맞는 문제가 없습니다</div>
             ) : (
