@@ -354,11 +354,16 @@ button.primary:hover {
   grid-template-rows: 1fr;
 }
 
-.catalog-panel-body > .table-wrap {
+.catalog-panel-inner {
+  min-height: 0;
   overflow: hidden;
 }
 
-.catalog-panel-body.open > .table-wrap {
+.catalog-panel-body .table-wrap {
+  overflow: hidden;
+}
+
+.catalog-panel-body.open .table-wrap {
   overflow-x: auto;
 }
 
