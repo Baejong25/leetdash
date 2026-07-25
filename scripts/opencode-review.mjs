@@ -7,6 +7,7 @@ import {
   buildMascotUrl,
   buildReviewPrompt,
   buildSourcePermalink,
+  injectLinePermalinks,
   parseSubmissionSolutionPath,
   renderReviewFileComment,
   renderReviewFileWarning,
@@ -371,6 +372,9 @@ async function reviewPullRequest({
           result.failure = error instanceof ReviewFailure ? error : failureForStage("catalog-resolve");
           delete result.contentKey;
           delete result.markdown;
+        }
+        if (result.status === "reviewed" && sourceUrl) {
+          result.markdown = injectLinePermalinks(result.markdown, sourceUrl);
         }
         const body = result.status === "reviewed"
           ? renderReviewFileComment({ path: result.path, sourceUrl, contentKey: result.contentKey, headSha, runUrl, mascotUrl, markdown: result.markdown })
