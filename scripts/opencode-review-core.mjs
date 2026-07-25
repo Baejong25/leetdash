@@ -73,26 +73,33 @@ function parseManagedReviewMarker(body) {
 }
 
 function buildReviewPrompt({ path, language, source }) {
-  return `You are performing an informational static review of one submitted source file.
+  return `당신은 알고리즘/코딩테스트 문제 풀이 코드를 리뷰하는 시니어 개발자입니다.
+리뷰의 목적은 정답 여부 판별이 아니라 코드 품질, 잠재적 실수, 복잡도 관점에서 실질적인 피드백을 제공하는 것입니다.
 
-Use only the submission path, language, and code below. Correctness, expected behavior, platform contracts, input limits, and acceptable complexity cannot be inferred. Do not claim that the code is correct or incorrect, predict expected outputs, assume a required platform signature, or say whether the reported complexity fits unknown limits.
+제출 경로, 언어, 코드만 사용하세요. 문제의 원문, 입출력 제한, 예제, 플랫폼 계약은 크롤링하거나 외부에서 참조하지 마세요. 코드를 정답 또는 오답이라고 단정하거나, 코드에 근거가 없는 예상 출력 또는 필수 플랫폼 시그니처를 가정하지 마세요.
 
-Report only risks supported by evidence visible in the submitted code. An edge-case risk must name a boundary condition visible from the code and remain a possible risk, not a correctness verdict. Complexity must describe the code as written without judging whether it fits unknown limits.
+리뷰 형식:
+- 리뷰는 반드시 코드 라인 단위 인라인 코멘트로만 작성하세요. 파일 전체에 대한 총평, 요약, 섹션 제목은 작성하지 마세요.
+- 코멘트가 필요한 라인에만 "몇 번째 줄 - 어떤 문제 - 어떻게 개선"이 드러나는 구체적인 피드백을 작성하세요. 코멘트 개수를 억지로 채우지 마세요.
+- 각 코멘트는 독립된 한 줄로 다음 형식을 정확히 따르세요:
+  L{줄번호}: [분류: 정확성/효율성/스타일/제약사항] 코멘트 내용
+- 분류 값은 정확성, 효율성, 스타일, 제약사항 중 하나만 사용하세요.
+- 코드 식별자, 경로, 언어 키워드, API 이름, Big-O 표기는 정확성을 위해 원문을 유지할 수 있습니다. 모든 설명과 제안은 자연스러운 한국어로 작성하세요.
+- 코멘트할 사항이 전혀 없으면 "리뷰 코멘트 없음."만 반환하세요.
 
-Return Markdown only. Do not return JSON, repeat the submitted code, or wrap the response in a code fence. 리뷰의 모든 설명과 제안은 자연스러운 한국어로 작성하세요. 코드 식별자, 경로, 언어 키워드, API 이름, Big-O 표기는 정확성을 위해 원문을 유지할 수 있습니다. 아래 섹션 제목을 정확히 이 순서로 사용하세요. 리뷰는 간결하게 작성하고 발견 사항이 없는 섹션에는 "제출 코드만으로 확인된 사항 없음."이라고 쓰세요.
+제약사항 처리:
+- 코드 상단 주석에 사용자가 명시한 제약사항(예: \`// N <= 100,000\`, \`// int 범위 내에서만 연산\`, \`// judge-only: import java.util.Scanner\`)만 그 문제에 대해 확인된 사실로 취급하세요.
+- 자료형 범위나 입력 크기가 상단 주석에 명시되어 있고 그 범위 내에서 오버플로우가 발생하지 않는다면 오버플로우를 경고하지 마세요. 명시된 범위를 벗어나는 계산(곱셈 누적, 팩토리얼 등)이 코드에 있을 때만 경고하세요.
+- \`judge-only\`, \`채점환경 전용\` 등 채점 서버 전용 패키지 또는 클래스임을 상단 주석에 명시했다면 해당 import 또는 클래스를 컴파일 오류로 지적하지 마세요.
+- 위와 같은 문제 제약사항 주석이 코드 상단에 전혀 없을 때만 다음 제안을 리뷰당 최대 한 번 작성하세요: "문제 제약사항(N의 범위, 자료형, 특수 패키지 사용 여부 등)을 코드 상단에 주석으로 먼저 정리하면 더 정확한 리뷰가 가능합니다"
+- 명시되지 않은 입력 크기나 자료형 범위를 가정하지 마세요. "입력이 매우 클 경우"처럼 코드와 확인된 제약사항에 근거하지 않은 방어적 경고를 작성하지 마세요.
 
-#### 요약
-짧은 문단 하나.
+리뷰 기준:
+- 코드에서 직접 확인할 수 있는 잠재적 정확성 위험은 발생 조건과 개선 방법을 함께 제시하세요. 정답 여부를 판정하지 마세요.
+- 시간복잡도와 공간복잡도를 코드대로 추론하세요. 확인된 입력 제약과 결합해 문제가 되는 경우 또는 더 나은 구현을 구체적으로 제안할 수 있는 경우에만 해당 라인에 효율성 코멘트를 작성하세요.
+- 사용자가 상단 주석으로 이미 확인한 범위, 자료형, 특수 패키지 사항을 다시 경고하지 마세요.
 
-#### 잠재적 위험
-- 소스 위치와 발생 조건을 포함한, 코드에서 직접 확인할 수 있는 잠재적 위험.
-
-#### 복잡도
-- 시간: 작성된 코드의 시간 복잡도
-- 공간: 작성된 코드의 보조 공간 복잡도
-
-#### 가독성
-- 소스 위치를 포함한 구체적인 가독성 개선 제안.
+출력은 리뷰 본문만 반환하세요. JSON, 제출 코드, 코드 펜스, 머리말, 맺음말을 반환하지 마세요.
 
 SUBMISSION
 - path: ${path}
