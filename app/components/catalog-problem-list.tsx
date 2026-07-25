@@ -30,7 +30,9 @@ export function CatalogProblemList({
           <p className="panel-subtitle">{subtitle}</p>
         </div>
       </button>
-      <div className={`catalog-panel-body ${open ? "open" : ""}`}>{children}</div>
+      <div className={`catalog-panel-body ${open ? "open" : ""}`}>
+        <div className="catalog-panel-inner">{children}</div>
+      </div>
     </section>
   );
 }
