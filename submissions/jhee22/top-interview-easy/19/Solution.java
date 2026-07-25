@@ -13,19 +13,19 @@ class Solution {
         ListNode tmp = new ListNode(0); 
         tmp.next = head; 
 
-        ListNode left = tmp; 
-        ListNode right = tmp; 
+        ListNode slow = tmp; 
+        ListNode fast= tmp; 
 
         for (int i = 0; i < n + 1; i++){
-            right = right.next; 
+            fast = fast.next; 
         } 
 
-        while (right != null) {
-            left = left.next; 
-            right = right.next; 
+        while (fast != null) {
+            slow = slow.next; 
+            fast = fast.next; 
         }
 
-        left.next = left.next.next; 
+        slow.next = slow.next.next; 
         return tmp.next;
 
         
