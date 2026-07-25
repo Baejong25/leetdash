@@ -6,6 +6,7 @@ import {
   buildMascotUrl,
   buildReviewPrompt,
   buildSourcePermalink,
+  injectLinePermalinks,
   parseSubmissionSolutionPath,
   parseManagedReviewMarker,
   renderReviewFileComment,
@@ -78,8 +79,10 @@ describe("review prompt", () => {
     expect(prompt).toContain("class Solution {}");
     expect(prompt).toContain("모든 설명과 제안은 자연스러운 한국어로 작성하세요.");
     expect(prompt).toContain("코드 식별자, 경로, 언어 키워드, API 이름, Big-O 표기는 정확성을 위해 원문을 유지할 수 있습니다.");
-    expect(prompt).toContain("L{줄번호}: [분류: 정확성/효율성/스타일/제약사항] 코멘트 내용");
+    expect(prompt).toContain("L{줄번호} `{해당 코드 조각}` [분류: 정확성/효율성/스타일/제약사항] 코멘트 내용");
     expect(prompt).toContain("분류 값은 정확성, 효율성, 스타일, 제약사항 중 하나만 사용하세요.");
+    expect(prompt).toContain("언어별 마크다운 코드 펜스(```{language})를 사용해");
+    expect(prompt).toContain("L{시작}-{끝} 형식으로 범위를 표시");
     expect(prompt).toContain("파일 전체에 대한 총평, 요약, 섹션 제목은 작성하지 마세요.");
     expect(prompt).toContain("코멘트 개수를 억지로 채우지 마세요.");
     expect(prompt).toContain("리뷰 코멘트 없음.");
@@ -106,6 +109,35 @@ describe("review prompt", () => {
     for (const forbidden of ["problem statement", "judge metadata", "official template", "leetcode_id", "title_slug"]) {
       expect(prompt.toLowerCase()).not.toContain(forbidden);
     }
+  });
+});
+
+describe("line permalink injection", () => {
+  it("converts L{num} to a clickable markdown link", () => {
+    const sourceUrl = "https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java";
+    expect(injectLinePermalinks("L17: [분류: 정확성] 배열 접근", sourceUrl))
+      .toBe("[L17](https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java#L17): [분류: 정확성] 배열 접근");
+    expect(injectLinePermalinks("L100:", sourceUrl))
+      .toBe("[L100](https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java#L100):");
+  });
+
+  it("converts L{num}-L{num} range to a clickable range link", () => {
+    const sourceUrl = "https://github.example/fork-user/leetdash/blob/abc1234/solution.java";
+    expect(injectLinePermalinks("L17-L19에서 반복문 확인", sourceUrl))
+      .toBe("[L17-L19](https://github.example/fork-user/leetdash/blob/abc1234/solution.java#L17-L19)에서 반복문 확인");
+  });
+
+  it("handles mixed single and range references without double-linking", () => {
+    const sourceUrl = "https://github.example/path/file";
+    const result = injectLinePermalinks("L5-L8 범위와 L12 단일 참조", sourceUrl);
+    expect(result).toContain("[L5-L8](https://github.example/path/file#L5-L8)");
+    expect(result).toContain("[L12](https://github.example/path/file#L12)");
+  });
+
+  it("returns non-string input unchanged", () => {
+    expect(injectLinePermalinks(undefined, "url")).toBeUndefined();
+    expect(injectLinePermalinks(null, "url")).toBeNull();
+    expect(injectLinePermalinks("text", undefined)).toBe("text");
   });
 });
 

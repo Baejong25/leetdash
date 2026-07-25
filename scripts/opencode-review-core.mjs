@@ -81,9 +81,11 @@ function buildReviewPrompt({ path, language, source }) {
 리뷰 형식:
 - 리뷰는 반드시 코드 라인 단위 인라인 코멘트로만 작성하세요. 파일 전체에 대한 총평, 요약, 섹션 제목은 작성하지 마세요.
 - 코멘트가 필요한 라인에만 "몇 번째 줄 - 어떤 문제 - 어떻게 개선"이 드러나는 구체적인 피드백을 작성하세요. 코멘트 개수를 억지로 채우지 마세요.
-- 각 코멘트는 독립된 한 줄로 다음 형식을 정확히 따르세요:
-  L{줄번호}: [분류: 정확성/효율성/스타일/제약사항] 코멘트 내용
+- 각 코멘트는 다음 형식을 정확히 따르세요:
+  L{줄번호} \`{해당 코드 조각}\` [분류: 정확성/효율성/스타일/제약사항] 코멘트 내용
 - 분류 값은 정확성, 효율성, 스타일, 제약사항 중 하나만 사용하세요.
+- 코드 블록이 필요하면 언어별 마크다운 코드 펜스(\`\`\`{language})를 사용해 구문 하이라이팅이 적용되도록 하세요.
+- 한 코멘트가 여러 라인에 걸치면 L{시작}-{끝} 형식으로 범위를 표시하고 \`\`\`{language} 코드 블록 안에 해당 코드를 담으세요.
 - 코드 식별자, 경로, 언어 키워드, API 이름, Big-O 표기는 정확성을 위해 원문을 유지할 수 있습니다. 모든 설명과 제안은 자연스러운 한국어로 작성하세요.
 - 코멘트할 사항이 전혀 없으면 "리뷰 코멘트 없음."만 반환하세요.
 
@@ -280,11 +282,24 @@ function renderReviewWarning({ headSha, failure, runUrl, mascotUrl }) {
   ].join("\n"));
 }
 
+function injectLinePermalinks(text, sourceUrl) {
+  if (typeof text !== "string" || typeof sourceUrl !== "string") return text;
+  // Single regex pass: ranges (L{num}-L{num}) take priority over singles (L{num}).
+  // Alternation tries range first so `L17-L19` is consumed whole, not as `L17` then `L19`.
+  return text.replace(/L(\d+)-L(\d+)|L(\d+)\b/g, (_match, rangeStart, rangeEnd, single) => {
+    if (rangeStart !== undefined) {
+      return `[L${rangeStart}-L${rangeEnd}](${sourceUrl}#L${rangeStart}-L${rangeEnd})`;
+    }
+    return `[L${single}](${sourceUrl}#L${single})`;
+  });
+}
+
 export {
   ReviewFailure,
   buildMascotUrl,
   buildReviewPrompt,
   buildSourcePermalink,
+  injectLinePermalinks,
   parseManagedReviewMarker,
   parseSubmissionSolutionPath,
   renderReviewFileComment,
