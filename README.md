@@ -10,6 +10,7 @@
 | LeetCode 75 | `leetcode-75` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/leetcode-75/1768/solution.ts` |
 | Top Interview 150 | `top-interview-150` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/top-interview-150/88/solution.ts` |
 | Programmers | `programmers` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers/12906/solution.java` |
+| 프로그래머스 고득점 Kit | `programmers-high-score-kit` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers-high-score-kit/42576/solution.java` |
 | SWEA | `swea` | SWEA 문제 번호 | `submissions/<githubUsername>/swea/1206/solution.py` |
 
 예를 들어 `https://leetcode.com/problems/plus-one/description/`의 `Plus One`은 LeetCode 문제 번호가 `66`이므로 제출 키도 `66`입니다. Explore URL의 마지막 숫자는 제출 키로 쓰지 않습니다. `1768. Merge Strings Alternately`는 `1768`, `88. Merge Sorted Array`는 `88`입니다.
@@ -86,6 +87,9 @@ submissions/
     programmers/
       12906/
         solution.java
+    programmers-high-score-kit/
+      42576/
+        solution.java
     swea/
       1206/
         solution.py
@@ -130,9 +134,10 @@ c, cc, cpp, cs, dart, go, java, js, kt, php, py, rb, rs, scala, sql, swift, ts
 - LeetCode 75
 - Top Interview 150
 - Programmers
+- 프로그래머스 고득점 Kit
 - SWEA
 
-카탈로그에서 각 목록의 `items[].submissionKey`가 실제 제출 폴더명입니다. LeetCode 목록은 LeetCode 문제 번호를 사용하며, Top Interview Questions Easy도 Explore URL 마지막 숫자가 아니라 문제 고유 LeetCode 번호를 사용합니다. Programmers와 SWEA는 각 플랫폼의 문제 번호를 사용합니다.
+카탈로그에서 각 목록의 `items[].submissionKey`가 실제 제출 폴더명입니다. LeetCode 목록은 LeetCode 문제 번호를 사용하며, Top Interview Questions Easy도 Explore URL 마지막 숫자가 아니라 문제 고유 LeetCode 번호를 사용합니다. Programmers, 프로그래머스 고득점 Kit, SWEA는 각 플랫폼의 문제 번호를 사용합니다.
 
 카탈로그 재생성은 운영자가 문제 목록 자체를 다시 만들 때만 사용합니다. 일반 참가자는 이 명령을 실행할 필요가 없습니다.
 
