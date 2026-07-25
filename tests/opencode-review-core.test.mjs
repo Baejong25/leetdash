@@ -66,7 +66,7 @@ describe("submission path parsing", () => {
 });
 
 describe("review prompt", () => {
-  it("requests readable Markdown using only submission identity, language, and source", () => {
+  it("requests Korean line-level comments using only explicit source constraints", () => {
     const prompt = buildReviewPrompt({
       path: reviewPath,
       language: "java",
@@ -76,20 +76,33 @@ describe("review prompt", () => {
     expect(prompt).toContain(reviewPath);
     expect(prompt).toContain("language: java");
     expect(prompt).toContain("class Solution {}");
-    expect(prompt).toContain("Return Markdown only");
-    expect(prompt).toContain("리뷰의 모든 설명과 제안은 자연스러운 한국어로 작성하세요.");
+    expect(prompt).toContain("모든 설명과 제안은 자연스러운 한국어로 작성하세요.");
     expect(prompt).toContain("코드 식별자, 경로, 언어 키워드, API 이름, Big-O 표기는 정확성을 위해 원문을 유지할 수 있습니다.");
-    expect(prompt).toContain("#### 요약");
-    expect(prompt).toContain("#### 잠재적 위험");
-    expect(prompt).toContain("#### 복잡도");
-    expect(prompt).toContain("#### 가독성");
-    expect(prompt).toContain("제출 코드만으로 확인된 사항 없음.");
-    expect(prompt).not.toContain("#### Summary");
-    expect(prompt).not.toContain("None observed from the submitted code alone.");
+    expect(prompt).toContain("L{줄번호}: [분류: 정확성/효율성/스타일/제약사항] 코멘트 내용");
+    expect(prompt).toContain("분류 값은 정확성, 효율성, 스타일, 제약사항 중 하나만 사용하세요.");
+    expect(prompt).toContain("파일 전체에 대한 총평, 요약, 섹션 제목은 작성하지 마세요.");
+    expect(prompt).toContain("코멘트 개수를 억지로 채우지 마세요.");
+    expect(prompt).toContain("리뷰 코멘트 없음.");
+    expect(prompt).toContain("코드 상단 주석");
+    expect(prompt).toContain("// N <= 100,000");
+    expect(prompt).toContain("// int 범위 내에서만 연산");
+    expect(prompt).toContain("// judge-only: import java.util.Scanner");
+    expect(prompt).toContain("그 문제에 대해 확인된 사실로 취급하세요.");
+    expect(prompt).toContain("그 범위 내에서 오버플로우가 발생하지 않는다면 오버플로우를 경고하지 마세요.");
+    expect(prompt).toContain("명시된 범위를 벗어나는 계산");
+    expect(prompt).toContain("해당 import 또는 클래스를 컴파일 오류로 지적하지 마세요.");
+    expect(prompt).toContain("문제 제약사항(N의 범위, 자료형, 특수 패키지 사용 여부 등)을 코드 상단에 주석으로 먼저 정리하면 더 정확한 리뷰가 가능합니다");
+    expect(prompt).toContain("리뷰당 최대 한 번");
+    expect(prompt).toContain("시간복잡도와 공간복잡도를 코드대로 추론하세요.");
+    expect(prompt).toContain("입력이 매우 클 경우");
+    expect(prompt).toContain("코드와 확인된 제약사항에 근거하지 않은 방어적 경고를 작성하지 마세요.");
+    expect(prompt).not.toContain("#### 요약");
+    expect(prompt).not.toContain("#### 잠재적 위험");
+    expect(prompt).not.toContain("#### 복잡도");
+    expect(prompt).not.toContain("#### 가독성");
     expect(prompt).not.toContain("schema_version");
-    expect(prompt).toContain("Do not return JSON");
+    expect(prompt).toContain("JSON");
     expect(prompt).not.toContain("REQUIRED JSON SHAPE");
-    expect(prompt).toContain("cannot be inferred");
     for (const forbidden of ["problem statement", "judge metadata", "official template", "leetcode_id", "title_slug"]) {
       expect(prompt.toLowerCase()).not.toContain(forbidden);
     }
