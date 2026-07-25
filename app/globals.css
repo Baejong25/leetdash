@@ -346,6 +346,7 @@ button.primary:hover {
 .catalog-panel-body {
   display: grid;
   grid-template-rows: 0fr;
+  overflow: hidden;
   transition: grid-template-rows 0.25s ease;
 }
 
