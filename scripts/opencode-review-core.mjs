@@ -224,12 +224,15 @@ function warningLines(failure) {
   return lines;
 }
 
-function renderReviewFileComment({ path, sourceUrl, contentKey, headSha, runUrl, mascotUrl, markdown }) {
+function renderReviewFileComment({ path, sourceUrl, contentKey, headSha, runUrl, mascotUrl, markdown, lineCount }) {
+  const permalink = Number.isInteger(lineCount) && lineCount > 0
+    ? `${sourceUrl}#L1-L${lineCount}`
+    : sourceUrl;
   return limitComment([
     reviewFileMarker(path),
     reviewContentMarker(contentKey),
     ...brandedHeader({ mascotUrl, title: "찰싹봇의 코드 리뷰" }),
-    `파일: [${markdownText(path)}](${markdownText(sourceUrl)})`,
+    `파일: [${markdownText(path)}](${markdownText(permalink)})`,
     `커밋: ${markdownText(headSha)}`,
     `워크플로: ${markdownText(runUrl)}`,
     "",
