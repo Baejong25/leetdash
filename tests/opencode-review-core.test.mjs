@@ -113,25 +113,25 @@ describe("review prompt", () => {
 });
 
 describe("line permalink injection", () => {
-  it("converts L{num} to a clickable markdown link", () => {
+  it("converts L{num} to a raw GitHub permalink for code preview", () => {
     const sourceUrl = "https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java";
     expect(injectLinePermalinks("L17: [분류: 정확성] 배열 접근", sourceUrl))
-      .toBe("[L17](https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java#L17): [분류: 정확성] 배열 접근");
+      .toBe("https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java#L17: [분류: 정확성] 배열 접근");
     expect(injectLinePermalinks("L100:", sourceUrl))
-      .toBe("[L100](https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java#L100):");
+      .toBe("https://github.example/fork-user/leetdash/blob/abc1234/submissions/ada/1/solution.java#L100:");
   });
 
-  it("converts L{num}-L{num} range to a clickable range link", () => {
+  it("converts L{num}-L{num} range to a raw GitHub permalink", () => {
     const sourceUrl = "https://github.example/fork-user/leetdash/blob/abc1234/solution.java";
     expect(injectLinePermalinks("L17-L19에서 반복문 확인", sourceUrl))
-      .toBe("[L17-L19](https://github.example/fork-user/leetdash/blob/abc1234/solution.java#L17-L19)에서 반복문 확인");
+      .toBe("https://github.example/fork-user/leetdash/blob/abc1234/solution.java#L17-L19에서 반복문 확인");
   });
 
   it("handles mixed single and range references without double-linking", () => {
     const sourceUrl = "https://github.example/path/file";
     const result = injectLinePermalinks("L5-L8 범위와 L12 단일 참조", sourceUrl);
-    expect(result).toContain("[L5-L8](https://github.example/path/file#L5-L8)");
-    expect(result).toContain("[L12](https://github.example/path/file#L12)");
+    expect(result).toContain("https://github.example/path/file#L5-L8");
+    expect(result).toContain("https://github.example/path/file#L12");
   });
 
   it("returns non-string input unchanged", () => {
