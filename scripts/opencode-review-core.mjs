@@ -288,9 +288,9 @@ function injectLinePermalinks(text, sourceUrl) {
   // Alternation tries range first so `L17-L19` is consumed whole, not as `L17` then `L19`.
   return text.replace(/L(\d+)-L(\d+)|L(\d+)\b/g, (_match, rangeStart, rangeEnd, single) => {
     if (rangeStart !== undefined) {
-      return `[L${rangeStart}-L${rangeEnd}](${sourceUrl}#L${rangeStart}-L${rangeEnd})`;
+      return `${sourceUrl}#L${rangeStart}-L${rangeEnd}`;
     }
-    return `[L${single}](${sourceUrl}#L${single})`;
+    return `${sourceUrl}#L${single}`;
   });
 }
 
