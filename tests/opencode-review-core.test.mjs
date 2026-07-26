@@ -319,6 +319,24 @@ describe("review Markdown rendering", () => {
     expect(markdown).toContain("https://example.test/run 42\\|x");
   });
 
+  it("renders a full-file #L1-L{count} permalink when lineCount is provided", () => {
+    const mascotUrl = `https://github.com/example/leetdash/raw/${"a".repeat(40)}/public/chalsakbot.png`;
+    const headSha = "abc1234";
+    const sourceUrl = `https://github.com/example/leetdash/blob/${headSha}/${reviewPath}`;
+    const markdown = renderReviewFileComment({
+      contentKey: "a".repeat(64),
+      mascotUrl,
+      headSha,
+      path: reviewPath,
+      sourceUrl,
+      markdown: "L17 코멘트",
+      runUrl: "https://github.com/example/leetdash/actions/runs/42",
+      lineCount: 42,
+    });
+    expect(markdown).toContain(`파일: [${reviewPath}](${sourceUrl}#L1-L42)`);
+    expect(markdown).toContain("L17 코멘트");
+  });
+
   it("keeps the managed comment below GitHub size limits", () => {
     const markdown = renderReviewFileComment({
       contentKey: "a".repeat(64),

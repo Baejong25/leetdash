@@ -238,10 +238,12 @@ async function reviewOneFile({ file, readSource, openCodeClient, model, apiKey, 
     stage = "model-request";
     const raw = await openCodeClient.review({ model, apiKey, prompt });
     stage = "model-response";
+    const lineCount = source.split("\n").length;
     return {
       path: filePath,
       status: "reviewed",
       contentKey,
+      lineCount,
       markdown: sanitizeReviewMarkdown(redactModelText(raw, source)),
     };
   } catch (error) {
@@ -377,7 +379,7 @@ async function reviewPullRequest({
           result.markdown = injectLinePermalinks(result.markdown, sourceUrl);
         }
         const body = result.status === "reviewed"
-          ? renderReviewFileComment({ path: result.path, sourceUrl, contentKey: result.contentKey, headSha, runUrl, mascotUrl, markdown: result.markdown })
+          ? renderReviewFileComment({ path: result.path, sourceUrl, contentKey: result.contentKey, headSha, runUrl, mascotUrl, markdown: result.markdown, lineCount: result.lineCount })
           : renderReviewFileWarning({ path: result.path, sourceUrl, headSha, runUrl, mascotUrl, failure: result.failure });
         if (!commentDiscoveryAvailable) {
           deliveryFailureCount += 1;
