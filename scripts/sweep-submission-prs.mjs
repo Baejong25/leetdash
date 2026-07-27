@@ -17,6 +17,15 @@ const defaultReviewWorkflow = "opencode-review.yml";
 const defaultDeployWorkflow = "deploy-pages.yml";
 const maxWorkflowRunPages = 10;
 
+class GitHubRequestError extends Error {
+  constructor(message, { status, responseMessage }) {
+    super(message);
+    this.name = "GitHubRequestError";
+    this.status = status;
+    this.responseMessage = responseMessage;
+  }
+}
+
 function readJson(relativePath) {
   return JSON.parse(readFileSync(path.join(process.cwd(), relativePath), "utf8"));
 }
@@ -195,9 +204,10 @@ function evaluatePullRequest({
 }
 
 class GitHubClient {
-  constructor({ repository, token }) {
+  constructor({ repository, token, workflowMergeToken }) {
     this.repository = repository;
     this.token = token;
+    this.workflowMergeToken = workflowMergeToken;
   }
 
   async request(method, apiPath, { body, params } = {}) {
@@ -221,6 +231,15 @@ class GitHubClient {
 
     const text = await response.text();
     if (!response.ok) {
+      let responseMessage;
+      try {
+        const responseBody = JSON.parse(text);
+        if (typeof responseBody?.message === "string") {
+          responseMessage = responseBody.message;
+        }
+      } catch {
+        // Preserve non-JSON response text in the formatted error only.
+      }
       const diagnostics = [
         ["request_id", response.headers.get("x-github-request-id")],
         ["retry_after", response.headers.get("retry-after")],
@@ -230,8 +249,9 @@ class GitHubClient {
         .filter(([, value]) => value !== null)
         .map(([name, value]) => `${name}=${value}`)
         .join(" ");
-      throw new Error(
+      throw new GitHubRequestError(
         `${method} ${apiPath} failed with ${response.status}: ${text}${diagnostics ? ` (${diagnostics})` : ""}`,
+        { status: response.status, responseMessage },
       );
     }
 
@@ -312,13 +332,32 @@ class GitHubClient {
     return this.request("GET", `/actions/runs/${runId}`);
   }
 
-  mergePullRequest(number, sha) {
-    return this.request("PUT", `/pulls/${number}/merge`, {
+  async mergePullRequest(number, sha) {
+    const requestOptions = {
       body: {
         merge_method: "merge",
         sha,
       },
-    });
+    };
+    try {
+      return await this.request("PUT", `/pulls/${number}/merge`, requestOptions);
+    } catch (error) {
+      const missingWorkflowScope = (
+        error instanceof GitHubRequestError
+        && error.status === 403
+        && /^refusing to allow a Personal Access Token to create or update workflow `[^`\r\n]+` without `workflow` scope$/.test(
+          error.responseMessage ?? "",
+        )
+      );
+      if (!missingWorkflowScope || !this.workflowMergeToken) {
+        throw error;
+      }
+      const workflowMergeClient = new GitHubClient({
+        repository: this.repository,
+        token: this.workflowMergeToken,
+      });
+      return workflowMergeClient.request("PUT", `/pulls/${number}/merge`, requestOptions);
+    }
   }
 
   dispatchWorkflow(workflowFile, ref) {
@@ -475,7 +514,10 @@ async function main(options = {}) {
   const requiredStatusCreator = env.SWEEP_REQUIRED_STATUS_CREATOR ?? defaultRequiredStatusCreator;
   const reviewWorkflow = env.SWEEP_REVIEW_WORKFLOW ?? defaultReviewWorkflow;
   const deployWorkflow = env.SWEEP_DEPLOY_WORKFLOW ?? defaultDeployWorkflow;
-  const client = options.client ?? new GitHubClient({ repository, token });
+  const workflowMergeToken = env.GH_TOKEN && env.GITHUB_TOKEN && env.GH_TOKEN !== env.GITHUB_TOKEN
+    ? env.GITHUB_TOKEN
+    : undefined;
+  const client = options.client ?? new GitHubClient({ repository, token, workflowMergeToken });
   const users = options.users ?? readJson("data/users.json");
   const catalog = options.catalog ?? readJson("data/problem-catalog.json");
   const result = await sweepSubmissionPullRequests({

@@ -39,6 +39,7 @@ jobs:
         run: node scripts/sweep-submission-prs.mjs
         env:
           GH_TOKEN: ${{ secrets.SWEEP_MERGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SWEEP_BASE_BRANCH: master
           SWEEP_REQUIRED_CHECKS: validate
           SWEEP_REQUIRED_STATUSES: opencode-review-gate

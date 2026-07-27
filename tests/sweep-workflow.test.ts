@@ -26,6 +26,7 @@ describe("submission sweeper workflow triggers", () => {
 
   it("uses the dedicated merge token so fork pull requests can be merged by the sweeper", () => {
     expect(workflow).toContain("GH_TOKEN: ${{ secrets.SWEEP_MERGE_TOKEN }}");
+    expect(workflow).toContain("GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
     expect(workflow).not.toContain("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
   });
 });
