@@ -49,20 +49,22 @@ Create a dedicated fine-grained Personal Access Token owned by
 - Expiration: 90 days
 - Repository permissions:
   - Actions: Read and write
-  - Checks: Read
   - Commit statuses: Read
   - Contents: Read and write
   - Pull requests: Read
   - Workflows: Read and write
 
 Metadata read access is implicit. No account permissions are required.
+GitHub's fine-grained PAT form does not expose a Checks permission for this
+token. Because `whoisyourbias/leetdash` is public, the Check Runs read endpoint
+used by the sweeper remains available without that permission.
 
 These permissions map to the sweeper's existing REST calls:
 
 | Operation | Permission |
 | --- | --- |
 | List PRs and PR files | Pull requests: Read |
-| Read validation Check Runs | Checks: Read |
+| Read validation Check Runs | Public repository access; no selectable PAT permission |
 | Read `opencode-review-gate` statuses | Commit statuses: Read |
 | Read review workflow runs | Actions: Read |
 | Merge a pull request | Contents: Write |

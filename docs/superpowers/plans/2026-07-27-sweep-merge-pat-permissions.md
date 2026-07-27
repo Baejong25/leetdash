@@ -13,7 +13,8 @@
 - The PAT must be limited to the single repository `whoisyourbias/leetdash`.
 - The PAT must not be the operator's GitHub CLI OAuth token.
 - The PAT must expire after 90 days.
-- Repository permissions must be exactly: Actions read/write, Checks read, Commit statuses read, Contents read/write, Pull requests read, and Workflows read/write.
+- Repository permissions must be: Actions read/write, Commit statuses read, Contents read/write, Pull requests read, and Workflows read/write.
+- Do not add a Checks permission if the fine-grained PAT form does not expose it. The public repository's Check Runs endpoint remains readable without that permission.
 - No account permissions may be granted.
 - Never put the PAT value in a command argument, source file, test fixture, plan, chat message, workflow summary, or Actions log.
 - Preserve exact-head merge pinning, eligibility checks, required-check provenance, review freshness, failure continuation, summary generation, and deploy dispatch.
@@ -68,7 +69,6 @@ Set repository permissions to:
 
 ```text
 Actions: Read and write
-Checks: Read
 Commit statuses: Read
 Contents: Read and write
 Pull requests: Read
@@ -272,12 +272,14 @@ After the deployment URL list in `README.md`, add:
 
 - 만료: 90일
 - Actions: Read and write
-- Checks: Read
 - Commit statuses: Read
 - Contents: Read and write
 - Pull requests: Read
 - Workflows: Read and write
 - Account permissions: 없음
+
+`Checks`가 fine-grained PAT 화면에 없으면 추가하지 않습니다. public 저장소의
+Check Runs 조회에는 이 권한이 필요하지 않습니다.
 
 만료 전에 새 토큰을 만든 뒤 아래 명령의 숨겨진 입력 prompt에서 값을
 입력합니다. 토큰을 명령 인자, 환경 변수, 파일, 로그에 남기지 않습니다.

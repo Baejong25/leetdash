@@ -199,12 +199,13 @@ PR에서는 `typecheck`, `test`, `build`까지만 실행합니다. `master` push
 - Expiration: 90일
 - Repository permissions:
   - Actions: Read and write
-  - Checks: Read-only
   - Commit statuses: Read-only
   - Contents: Read and write
   - Pull requests: Read-only
   - Workflows: Read and write
 - Account permissions: 없음
+
+`Checks`가 fine-grained PAT 화면에 표시되지 않아도 추가하지 않습니다. 이 저장소는 public이므로 sweep이 사용하는 Check Runs 조회 API는 해당 권한 없이 사용할 수 있습니다.
 
 토큰 값을 명령 인자, 셸 히스토리, 로그, 이슈 또는 PR에 남기지 않습니다. 발급 직후 아래 명령을 실행하고 숨김 입력 프롬프트에 토큰을 붙여 넣습니다.
 
