@@ -67,7 +67,7 @@ describe("OpenCodeClient", () => {
       expect(failure).toMatchObject({
         stage: "model-request",
         reason: "MODEL_REQUEST_FAILED",
-        detail: "OpenCode request failed.",
+        detail: "OpenCode request timed out after 180s.",
       });
       expect(failure.detail).not.toContain(apiKey);
       expect(failure.detail).not.toContain(rawBody);
