@@ -1,0 +1,62 @@
+name: OpenCode Submission Review
+run-name: opencode-review:${{ github.event.workflow_run.head_sha }}
+
+on:
+  workflow_run:
+    workflows: ["Deploy GitHub Pages"]
+    types:
+      - completed
+
+permissions: {}
+
+concurrency:
+  group: opencode-review-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    timeout-minutes: 45
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve triggering pull request
+        id: resolve-pr
+        run: node scripts/resolve-opencode-review-pr.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENCODE_BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          OPENCODE_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          OPENCODE_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          OPENCODE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Checkout trusted pull-request base
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.resolve-pr.outputs.base-sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run trusted OpenCode review
+        run: |
+          node scripts/opencode-review.mjs \
+            --base "${{ steps.resolve-pr.outputs.base-sha }}" \
+            --head "${{ steps.resolve-pr.outputs.head-sha }}" \
+            --pull-number "${{ steps.resolve-pr.outputs.pull-number }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENCODE_REVIEW_MODEL: ${{ vars.OPENCODE_REVIEW_MODEL }}

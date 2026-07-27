@@ -1,0 +1,49 @@
+name: Sweep Submission PRs
+
+on:
+  workflow_run:
+    workflows: ["OpenCode Submission Review"]
+    types:
+      - completed
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: sweep-submission-prs
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Merge eligible submission PRs
+        run: node scripts/sweep-submission-prs.mjs
+        env:
+          GH_TOKEN: ${{ secrets.SWEEP_MERGE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SWEEP_BASE_BRANCH: master
+          SWEEP_REQUIRED_CHECKS: validate
+          SWEEP_REQUIRED_STATUSES: opencode-review-gate
+          SWEEP_REQUIRED_CHECK_APP: github-actions
+          SWEEP_REQUIRED_STATUS_CREATOR: github-actions[bot]
+          SWEEP_REVIEW_WORKFLOW: opencode-review.yml
+          SWEEP_DEPLOY_WORKFLOW: deploy-pages.yml
