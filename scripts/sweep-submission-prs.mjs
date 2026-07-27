@@ -204,10 +204,9 @@ function evaluatePullRequest({
 }
 
 class GitHubClient {
-  constructor({ repository, token, workflowMergeToken }) {
+  constructor({ repository, token }) {
     this.repository = repository;
     this.token = token;
-    this.workflowMergeToken = workflowMergeToken;
   }
 
   async request(method, apiPath, { body, params } = {}) {
@@ -333,31 +332,12 @@ class GitHubClient {
   }
 
   async mergePullRequest(number, sha) {
-    const requestOptions = {
+    return this.request("PUT", `/pulls/${number}/merge`, {
       body: {
         merge_method: "merge",
         sha,
       },
-    };
-    try {
-      return await this.request("PUT", `/pulls/${number}/merge`, requestOptions);
-    } catch (error) {
-      const missingWorkflowScope = (
-        error instanceof GitHubRequestError
-        && error.status === 403
-        && /^refusing to allow a Personal Access Token to create or update workflow `[^`\r\n]+` without `workflow` scope$/.test(
-          error.responseMessage ?? "",
-        )
-      );
-      if (!missingWorkflowScope || !this.workflowMergeToken) {
-        throw error;
-      }
-      const workflowMergeClient = new GitHubClient({
-        repository: this.repository,
-        token: this.workflowMergeToken,
-      });
-      return workflowMergeClient.request("PUT", `/pulls/${number}/merge`, requestOptions);
-    }
+    });
   }
 
   dispatchWorkflow(workflowFile, ref) {
@@ -514,10 +494,7 @@ async function main(options = {}) {
   const requiredStatusCreator = env.SWEEP_REQUIRED_STATUS_CREATOR ?? defaultRequiredStatusCreator;
   const reviewWorkflow = env.SWEEP_REVIEW_WORKFLOW ?? defaultReviewWorkflow;
   const deployWorkflow = env.SWEEP_DEPLOY_WORKFLOW ?? defaultDeployWorkflow;
-  const workflowMergeToken = env.GH_TOKEN && env.GITHUB_TOKEN && env.GH_TOKEN !== env.GITHUB_TOKEN
-    ? env.GITHUB_TOKEN
-    : undefined;
-  const client = options.client ?? new GitHubClient({ repository, token, workflowMergeToken });
+  const client = options.client ?? new GitHubClient({ repository, token });
   const users = options.users ?? readJson("data/users.json");
   const catalog = options.catalog ?? readJson("data/problem-catalog.json");
   const result = await sweepSubmissionPullRequests({

@@ -668,18 +668,20 @@ describe("submission PR sweeper CLI outcome", () => {
 });
 
 describe("GitHubClient check-run retrieval", () => {
-  it("retries a workflow-scope merge rejection with the Actions token", async () => {
+  it("preserves a workflow-scope merge rejection without crossing credential boundaries", async () => {
     const originalFetch = globalThis.fetch;
     const requests = [];
     globalThis.fetch = async (_url, init) => {
       requests.push(init);
-      if (requests.length === 1) {
-        return new Response(JSON.stringify({
-          message: "refusing to allow a Personal Access Token to create or update workflow `.github/workflows/deploy-pages.yml` without `workflow` scope",
-          status: "403",
-        }), { status: 403 });
-      }
-      return new Response(JSON.stringify({ merged: true, sha: "merge-sha" }), { status: 200 });
+      return new Response(JSON.stringify({
+        message: "refusing to allow a Personal Access Token to create or update workflow `.github/workflows/deploy-pages.yml` without `workflow` scope",
+        status: "403",
+      }), {
+        status: 403,
+        headers: {
+          "x-github-request-id": "REQ-WORKFLOW-SCOPE",
+        },
+      });
     };
 
     try {
@@ -688,61 +690,9 @@ describe("GitHubClient check-run retrieval", () => {
         token: "merge-pat",
         workflowMergeToken: "actions-token",
       });
-      await expect(client.mergePullRequest(91, "head-sha")).resolves.toEqual({
-        merged: true,
-        sha: "merge-sha",
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-
-    expect(requests).toHaveLength(2);
-    expect(requests.map((request) => request.headers.Authorization)).toEqual([
-      "Bearer merge-pat",
-      "Bearer actions-token",
-    ]);
-  });
-
-  it.each([
-    [
-      "an unrelated 403",
-      403,
-      "Resource not accessible by personal access token",
-      "actions-token",
-    ],
-    [
-      "the workflow-scope message with a non-403 status",
-      422,
-      "refusing to allow a Personal Access Token to create or update workflow `.github/workflows/deploy-pages.yml` without `workflow` scope",
-      "actions-token",
-    ],
-    [
-      "a prefixed near-match message",
-      403,
-      "proxy error: refusing to allow a Personal Access Token to create or update workflow `.github/workflows/deploy-pages.yml` without `workflow` scope",
-      "actions-token",
-    ],
-    [
-      "the target 403 without an Actions token",
-      403,
-      "refusing to allow a Personal Access Token to create or update workflow `.github/workflows/deploy-pages.yml` without `workflow` scope",
-      undefined,
-    ],
-  ])("does not cross the credential boundary for %s", async (_name, status, message, workflowMergeToken) => {
-    const originalFetch = globalThis.fetch;
-    const requests = [];
-    globalThis.fetch = async (_url, init) => {
-      requests.push(init);
-      return new Response(JSON.stringify({ message, status: String(status) }), { status });
-    };
-
-    try {
-      const client = new GitHubClient({
-        repository: "leetdash/test",
-        token: "merge-pat",
-        workflowMergeToken,
-      });
-      await expect(client.mergePullRequest(91, "head-sha")).rejects.toThrow(message);
+      await expect(client.mergePullRequest(91, "head-sha")).rejects.toThrow(
+        "request_id=REQ-WORKFLOW-SCOPE",
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }
