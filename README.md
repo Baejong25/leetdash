@@ -2,29 +2,42 @@
 
 ## 제출 규칙
 
-풀이 폴더는 반드시 아래 세 소스별 규칙을 따릅니다. `slug`나 LeetCode 내부 ID는 참가자 폴더명으로 쓰지 않습니다.
+풀이 폴더는 반드시 아래 소스별 규칙을 따릅니다. `slug`나 LeetCode 내부 ID는 참가자 폴더명으로 쓰지 않습니다.
 
 | 소스 | `sourceKey` | `submissionKey` 기준 | 예시 경로 |
 | --- | --- | --- | --- |
 | Top Interview Questions Easy | `top-interview-easy` | 문제 고유 LeetCode 번호 | `submissions/<githubUsername>/top-interview-easy/66/solution.ts` |
 | LeetCode 75 | `leetcode-75` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/leetcode-75/1768/solution.ts` |
 | Top Interview 150 | `top-interview-150` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/top-interview-150/88/solution.ts` |
+| Programmers | `programmers` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers/12906/solution.java` |
+| 프로그래머스 고득점 Kit | `programmers-high-score-kit` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers-high-score-kit/42576/solution.java` |
+| SWEA | `swea` | SWEA 문제 번호 | `submissions/<githubUsername>/swea/1206/solution.py` |
 
 예를 들어 `https://leetcode.com/problems/plus-one/description/`의 `Plus One`은 LeetCode 문제 번호가 `66`이므로 제출 키도 `66`입니다. Explore URL의 마지막 숫자는 제출 키로 쓰지 않습니다. `1768. Merge Strings Alternately`는 `1768`, `88. Merge Sorted Array`는 `88`입니다.
 
-소규모 LeetCode 스터디 그룹을 위한 진행 현황 대시보드입니다. 참가자는 이 레포에서 각자 브랜치를 만들고 풀이를 추가합니다. 변경 사항이 `master`에 머지되고 사이트가 다시 빌드되면 공식 대시보드가 갱신됩니다.
+소규모 LeetCode 스터디 그룹을 위한 진행 현황 대시보드입니다. 참가자는 이 레포를 Fork한 뒤 자신의 Fork에서 작업 브랜치를 만들어 풀이를 추가합니다. 변경 사항이 PR로 원본 레포의 `master`에 머지되고 사이트가 다시 빌드되면 공식 대시보드가 갱신됩니다.
 
 ## 운영 방식
 
-1. 참가자가 이 레포에서 본인 작업 브랜치를 만듭니다.
-2. 풀이를 `submissions/<githubUsername>/<sourceKey>/<submissionKey>/` 아래에 추가합니다.
-3. PR을 만들고 `master`에 머지합니다.
-4. GitHub Actions가 검증과 정적 빌드를 실행합니다.
-5. `master`에 머지된 경우 GitHub Pages에 대시보드를 배포합니다.
+1. GitHub에서 이 원본 레포를 본인 계정으로 Fork합니다.
+2. Fork한 레포를 clone하고, Fork의 기본 브랜치에서 별도의 작업 브랜치를 만들어 checkout합니다.
+3. 풀이를 `submissions/<githubUsername>/<sourceKey>/<submissionKey>/` 아래에 추가하고 커밋합니다.
+4. 작업 브랜치를 본인의 Fork에 push합니다.
+5. `본인 Fork:작업 브랜치`에서 `원본 레포:master`를 대상으로 PR을 만듭니다.
+6. GitHub Actions가 검증과 정적 빌드를 실행하고, 제출 전용 PR의 `solution.*` 파일을 찰싹봇이 리뷰합니다.
+7. PR이 `master`에 머지되면 GitHub Pages에 대시보드가 배포됩니다.
+
+- 참가자는 Fork의 master에 직접 커밋하지 않고 매 작업마다 새 브랜치를 사용합니다. 
+- 원본 레포에 참가자 브랜치를 만들거나 직접 push하지 않습니다. 
+- PR에 충돌이 있을 때만 원본 레포의 최신 `master`를 본인의 작업 브랜치에 반영해 해결합니다.
 
 공개 페이지에는 `master`에 머지된 제출만 반영됩니다. 개인 브랜치는 직접 스캔하지 않습니다.
 
-PR은 `validate` 검증과 리뷰 조건을 통과하면 다른 PR의 GitHub Pages 배포 완료를 기다리지 않고 머지합니다. 저장소는 merge commit만 허용하며, squash merge와 rebase merge는 사용하지 않습니다. 충돌이 있는 PR만 개별적으로 `master`를 반영해 해결합니다.
+제출 대상이 `data/problem-catalog.json`에 아직 없으면 운영자가 카탈로그 변경 PR을 먼저 머지합니다. 참가자는 그 변경이 `master`에 반영된 뒤 풀이 파일만 담은 별도 PR을 만듭니다.
+
+PR은 `validate` 검증과 `opencode-review-gate` 상태를 통과하면 다른 PR의 GitHub Pages 배포 완료를 기다리지 않고 머지합니다. `opencode-review` Check Run은 상세 리뷰 기록으로 남고, 병합 gate는 최신 OpenCode workflow 실행 및 재시도 번호와 정확히 일치해야 합니다. 찰싹봇은 변경된 `solution.*` 파일을 하나씩 순서대로 리뷰하고, 각 OpenCode 응답 직후 해당 파일의 한국어 코멘트를 게시합니다. 각 파일 리뷰의 파일 경로는 리뷰한 head 커밋의 전체 소스 파일로 연결됩니다. 이전에 성공적으로 리뷰한 파일의 내용 해시가 같으면 기존 리뷰를 유지하고 OpenCode를 다시 호출하지 않으며, 내용이 바뀌었거나 이전 리뷰가 경고로 끝난 파일은 다시 리뷰합니다. 파일 하나의 리뷰나 코멘트 전달이 실패해도 경고를 남기고 다음 파일을 계속 처리하지만, 해당 gate는 실패하므로 sweep이 PR을 머지하지 않습니다. 세부 동작과 장애 복구 방식은 [Sweep After OpenCode Review 설계](docs/superpowers/specs/2026-07-23-sweep-after-opencode-review-design.md)에 정리되어 있습니다.
+
+저장소는 merge commit만 허용하며, squash merge와 rebase merge는 사용하지 않습니다.
 
 ## 참가자 등록
 
@@ -71,6 +84,15 @@ submissions/
     top-interview-150/
       88/
         solution.py
+    programmers/
+      12906/
+        solution.java
+    programmers-high-score-kit/
+      42576/
+        solution.java
+    swea/
+      1206/
+        solution.py
 ```
 
 대시보드는 문제 폴더 안에서 지원되는 `solution.{ext}` 파일을 찾으면 해당 문제를 완료로 계산합니다. 파일명 basename인 `solution`은 대소문자를 구분하지 않으므로 `Solution.java`도 인식합니다.
@@ -100,7 +122,7 @@ c, cc, cpp, cs, dart, go, java, js, kt, php, py, rb, rs, scala, sql, swift, ts
 
 `meta.json`만 있고 풀이 파일이 없으면 기본 상태는 `reviewing`입니다. `solution.*`만 있고 `meta.json`이 없으면 기본 상태는 `solved`입니다. 예전 `solutions/<id>/` 경로나 slug 폴더명은 공식 제출 경로로 인식하지 않습니다.
 
-같은 문제가 여러 소스에 들어 있는 경우 canonical `slug` 기준으로 한 문제로 집계합니다. 여러 제출이 있으면 `solved`, `reviewing`, `skipped` 순서로 더 높은 상태를 우선합니다.
+같은 문제가 여러 목록에 들어 있는 경우 canonical `problemKey` 기준으로 한 문제로 집계합니다. 여러 제출이 있으면 `solved`, `reviewing`, `skipped` 순서로 더 높은 상태를 우선합니다.
 
 ## 문제 카탈로그
 
@@ -111,8 +133,11 @@ c, cc, cpp, cs, dart, go, java, js, kt, php, py, rb, rs, scala, sql, swift, ts
 - Top Interview Questions Easy
 - LeetCode 75
 - Top Interview 150
+- Programmers
+- 프로그래머스 고득점 Kit
+- SWEA
 
-카탈로그에서 각 목록의 `items[].submissionKey`가 실제 제출 폴더명입니다. 모든 목록은 LeetCode 문제 번호를 사용하며, Top Interview Questions Easy도 Explore URL 마지막 숫자가 아니라 문제 고유 LeetCode 번호를 사용합니다.
+카탈로그에서 각 목록의 `items[].submissionKey`가 실제 제출 폴더명입니다. LeetCode 목록은 LeetCode 문제 번호를 사용하며, Top Interview Questions Easy도 Explore URL 마지막 숫자가 아니라 문제 고유 LeetCode 번호를 사용합니다. Programmers, 프로그래머스 고득점 Kit, SWEA는 각 플랫폼의 문제 번호를 사용합니다.
 
 카탈로그 재생성은 운영자가 문제 목록 자체를 다시 만들 때만 사용합니다. 일반 참가자는 이 명령을 실행할 필요가 없습니다.
 
@@ -181,7 +206,9 @@ npm run build
 
 현재 테스트 범위:
 
-- 카탈로그 목록 개수, slug 매핑, 제출 키 형식과 중복 검증
+- 카탈로그 목록 개수, provider-scoped `problemKey` 매핑, 제출 키 형식과 중복 검증
 - 소스별 제출 폴더 기반 정적 진행 데이터 생성
 - 풀이 파일 기본 판정과 `meta.json` 상태 재정의
 - 예전 `solutions/<id>/` 및 slug 제출 폴더 무시
+- 신뢰된 OpenCode 리뷰 범위, 상태 gate 수명주기, workflow 실행·재시도 상관관계
+- 병합 직전 재검증, 개별 병합 실패 후 계속 스캔, 요약 작성 뒤 비정상 종료
