@@ -80,15 +80,21 @@ class OpenCodeClient {
     }
 
     const controller = new AbortController();
-    const requestFailure = () => new ReviewFailure({
+    const requestFailure = (error) => new ReviewFailure({
       stage: "model-request",
       reason: "MODEL_REQUEST_FAILED",
-      detail: "OpenCode request failed.",
+      detail: error instanceof Error && error.message
+        ? `OpenCode request failed: ${error.message}`
+        : "OpenCode request failed.",
     });
     let timeout;
     const timeoutFailure = new Promise((_resolve, reject) => {
       timeout = setTimeout(() => {
-        reject(requestFailure());
+        reject(new ReviewFailure({
+          stage: "model-request",
+          reason: "MODEL_REQUEST_FAILED",
+          detail: `OpenCode request timed out after ${openCodeRequestTimeoutMs / 1000}s.`,
+        }));
         controller.abort();
       }, openCodeRequestTimeoutMs);
     });
@@ -112,7 +118,7 @@ class OpenCodeClient {
         ]);
       } catch (error) {
         if (error instanceof ReviewFailure) throw error;
-        throw requestFailure();
+        throw requestFailure(error);
       }
 
       if (!response?.ok) {
@@ -120,7 +126,7 @@ class OpenCodeClient {
           stage: "model-request",
           reason: "MODEL_REQUEST_FAILED",
           response,
-          detail: "OpenCode request failed.",
+          detail: `OpenCode request failed (HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}).`,
         });
       }
 
