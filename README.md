@@ -188,6 +188,40 @@ GitHub Actions checkout은 활동 달력 생성을 위해 `fetch-depth: 0`으로
 
 PR에서는 `typecheck`, `test`, `build`까지만 실행합니다. `master` push에서는 같은 검증을 통과한 뒤 `out/`을 GitHub Pages artifact로 업로드하고 배포합니다. 여러 PR이 연속으로 머지되면 GitHub Pages 배포는 최신 `master` 기준으로 진행되며, 이전 배포 작업은 취소될 수 있습니다.
 
+### Submission sweep 병합 토큰
+
+`.github/workflows/sweep-submission-prs.yml`은 저장소 Actions secret인 `SWEEP_MERGE_TOKEN`만 병합 자격증명으로 사용합니다. Fork가 오래되어 원본의 workflow 변경까지 병합 diff에 포함되는 경우에도 동작하도록, 이 secret에는 workflow 파일을 갱신할 수 있는 전용 fine-grained personal access token을 저장해야 합니다. 기본 `GITHUB_TOKEN`은 이 권한 오류의 fallback으로 사용하지 않습니다.
+
+토큰은 다음 범위로 발급합니다.
+
+- Resource owner: `whoisyourbias`
+- Repository access: `Only select repositories` → `leetdash`
+- Expiration: 90일
+- Repository permissions:
+  - Actions: Read and write
+  - Checks: Read-only
+  - Commit statuses: Read-only
+  - Contents: Read and write
+  - Pull requests: Read-only
+  - Workflows: Read and write
+- Account permissions: 없음
+
+토큰 값을 명령 인자, 셸 히스토리, 로그, 이슈 또는 PR에 남기지 않습니다. 발급 직후 아래 명령을 실행하고 숨김 입력 프롬프트에 토큰을 붙여 넣습니다.
+
+```bash
+gh secret set SWEEP_MERGE_TOKEN --repo whoisyourbias/leetdash
+```
+
+교체 후에는 secret 갱신 시각을 확인하고 sweep workflow를 수동 실행합니다.
+
+```bash
+gh secret list --app actions --repo whoisyourbias/leetdash
+gh workflow run sweep-submission-prs.yml --repo whoisyourbias/leetdash
+gh run list --workflow sweep-submission-prs.yml --repo whoisyourbias/leetdash --limit 3
+```
+
+새 토큰으로 sweep 성공을 확인하기 전에는 기존 토큰을 폐기하지 않습니다. 실패하면 실행 로그의 HTTP status, GitHub request ID, rate-limit 헤더를 기록하고 새 토큰의 저장소 선택과 권한을 다시 확인합니다. 성공 후에는 GitHub의 Personal access tokens 설정에서 이전 토큰만 폐기하고, 다음 만료일 전에 같은 절차로 교체합니다.
+
 ## 라우트
 
 - `/`: 대시보드 요약과 사용자별 진행 테이블
