@@ -222,6 +222,17 @@ function redactModelText(value, source) {
   return value.split(source).join("[submitted source redacted]");
 }
 
+async function reviewWithRetry({ openCodeClient, model, apiKey, prompt }) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await openCodeClient.review({ model, apiKey, prompt });
+    } catch (error) {
+      const failure = error instanceof ReviewFailure ? error : undefined;
+      if (attempt >= 2 || !failure || failure.stage !== "model-request" || failure.retryable !== true) throw error;
+    }
+  }
+}
+
 async function reviewOneFile({ file, readSource, openCodeClient, model, apiKey, cachedContentKey }) {
   let stage = "path-parse";
   let filePath = file.path;
@@ -236,7 +247,7 @@ async function reviewOneFile({ file, readSource, openCodeClient, model, apiKey, 
     }
     const prompt = buildReviewPrompt({ path: parsed.path, language: parsed.extension, source });
     stage = "model-request";
-    const raw = await openCodeClient.review({ model, apiKey, prompt });
+    const raw = await reviewWithRetry({ openCodeClient, model, apiKey, prompt });
     stage = "model-response";
     const lineCount = source.split("\n").length;
     return {

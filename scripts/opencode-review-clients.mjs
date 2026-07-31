@@ -83,6 +83,7 @@ class OpenCodeClient {
     const requestFailure = (error) => new ReviewFailure({
       stage: "model-request",
       reason: "MODEL_REQUEST_FAILED",
+      retryable: true,
       detail: error instanceof Error && error.message
         ? `OpenCode request failed: ${error.message}`
         : "OpenCode request failed.",
@@ -93,6 +94,7 @@ class OpenCodeClient {
         reject(new ReviewFailure({
           stage: "model-request",
           reason: "MODEL_REQUEST_FAILED",
+          retryable: true,
           detail: `OpenCode request timed out after ${openCodeRequestTimeoutMs / 1000}s.`,
         }));
         controller.abort();
