@@ -56,7 +56,7 @@ describe("OpenCodeClient", () => {
 
       await vi.advanceTimersByTimeAsync(0);
       expect(vi.getTimerCount()).toBe(1);
-      await vi.advanceTimersByTimeAsync(179_999);
+      await vi.advanceTimersByTimeAsync(299_999);
       expect(requestSignal.aborted).toBe(false);
       expect(vi.getTimerCount()).toBe(1);
       await vi.advanceTimersByTimeAsync(1);
@@ -68,7 +68,7 @@ describe("OpenCodeClient", () => {
         stage: "model-request",
         reason: "MODEL_REQUEST_FAILED",
         retryable: true,
-        detail: "OpenCode request timed out after 180s.",
+        detail: "OpenCode request timed out after 300s.",
       });
       expect(failure.detail).not.toContain(apiKey);
       expect(failure.detail).not.toContain(rawBody);

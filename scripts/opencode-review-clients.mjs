@@ -3,7 +3,7 @@ import { parseManagedReviewMarker, ReviewFailure } from "./opencode-review-core.
 const openCodeChatCompletionsUrl = "https://opencode.ai/zen/go/v1/chat/completions";
 const openCodeConfiguredModel = "opencode-go/deepseek-v4-flash";
 const openCodeApiModel = "deepseek-v4-flash";
-const openCodeRequestTimeoutMs = 180_000;
+const openCodeRequestTimeoutMs = 300_000;
 
 function extractRequestId(response) {
   const headers = response?.headers;
