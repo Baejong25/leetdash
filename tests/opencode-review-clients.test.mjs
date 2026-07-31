@@ -67,6 +67,7 @@ describe("OpenCodeClient", () => {
       expect(failure).toMatchObject({
         stage: "model-request",
         reason: "MODEL_REQUEST_FAILED",
+        retryable: true,
         detail: "OpenCode request timed out after 180s.",
       });
       expect(failure.detail).not.toContain(apiKey);
@@ -75,6 +76,48 @@ describe("OpenCodeClient", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("classifies transport failures as retryable with sanitized diagnostics", async () => {
+    const apiKey = "transport-secret";
+    const rawMessage = "provider-network-secret";
+    const client = new OpenCodeClient({
+      fetchImpl: async () => { throw new Error(rawMessage); },
+    });
+
+    const failure = await client.review({
+      model: "opencode-go/deepseek-v4-flash",
+      apiKey,
+      prompt: "review prompt",
+    }).catch((error) => error);
+
+    expect(failure).toMatchObject({
+      stage: "model-request",
+      reason: "MODEL_REQUEST_FAILED",
+      retryable: true,
+    });
+    expect(failure.detail).not.toContain(apiKey);
+  });
+
+  it.each([
+    ["401", 401],
+    ["403", 403],
+    ["404", 404],
+  ])("classifies HTTP %s as a non-retryable model-request failure", async (_name, status) => {
+    const client = new OpenCodeClient({
+      fetchImpl: async () => jsonResponse({ error: "rejected" }, { status }),
+    });
+
+    await expect(client.review({
+      model: "opencode-go/deepseek-v4-flash",
+      apiKey: "test-secret",
+      prompt: "review prompt",
+    })).rejects.toMatchObject({
+      stage: "model-request",
+      reason: "MODEL_REQUEST_FAILED",
+      retryable: false,
+      httpStatus: status,
+    });
   });
 
   it("redacts API keys and provider response bodies from request failures", async () => {
