@@ -3,7 +3,7 @@ import { parseManagedReviewMarker, ReviewFailure } from "./opencode-review-core.
 const openCodeChatCompletionsUrl = "https://opencode.ai/zen/go/v1/chat/completions";
 const openCodeConfiguredModel = "opencode-go/deepseek-v4-flash";
 const openCodeApiModel = "deepseek-v4-flash";
-const openCodeRequestTimeoutMs = 180_000;
+const openCodeRequestTimeoutMs = 300_000;
 
 function extractRequestId(response) {
   const headers = response?.headers;
@@ -83,6 +83,7 @@ class OpenCodeClient {
     const requestFailure = (error) => new ReviewFailure({
       stage: "model-request",
       reason: "MODEL_REQUEST_FAILED",
+      retryable: true,
       detail: error instanceof Error && error.message
         ? `OpenCode request failed: ${error.message}`
         : "OpenCode request failed.",
@@ -93,6 +94,7 @@ class OpenCodeClient {
         reject(new ReviewFailure({
           stage: "model-request",
           reason: "MODEL_REQUEST_FAILED",
+          retryable: true,
           detail: `OpenCode request timed out after ${openCodeRequestTimeoutMs / 1000}s.`,
         }));
         controller.abort();

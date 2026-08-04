@@ -279,6 +279,88 @@ describe("reviewPullRequest", () => {
     expect(completed.at(-1)).toMatchObject({ conclusion: "success" });
   });
 
+  it("retries a retryable model-request failure once and recovers with a normal review", async () => {
+    const attempts = [];
+    const { options, comments, completed } = reviewOptions({
+      openCodeClient: { review: async () => {
+        attempts.push("attempt");
+        if (attempts.length === 1) {
+          throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: true });
+        }
+        return passResult();
+      } },
+    });
+
+    const result = await reviewPullRequest(options);
+
+    expect(attempts).toHaveLength(2);
+    expect(result.results).toMatchObject([{ path: firstPath, status: "reviewed" }]);
+    expect(comments[0].body).toContain("찰싹봇의 코드 리뷰");
+    expect(comments[0].body).not.toContain("리뷰 경고");
+    expect(completed.at(-1)).toMatchObject({ conclusion: "success" });
+  });
+
+  it("publishes a warning after two retryable model-request failures", async () => {
+    const attempts = [];
+    const { options, comments, completed } = reviewOptions({
+      openCodeClient: { review: async () => {
+        attempts.push("attempt");
+        throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: true });
+      } },
+    });
+
+    const result = await reviewPullRequest(options);
+
+    expect(attempts).toHaveLength(2);
+    expect(result.results).toMatchObject([{
+      path: firstPath,
+      status: "warning",
+      failure: { stage: "model-request", reason: "MODEL_REQUEST_FAILED" },
+    }]);
+    expect(comments[0].body).toContain("찰싹봇 리뷰 경고");
+    expect(completed.at(-1)).toMatchObject({ conclusion: "success" });
+  });
+
+  it("attempts a non-retryable model-request failure only once", async () => {
+    const attempts = [];
+    const { options, comments } = reviewOptions({
+      openCodeClient: { review: async () => {
+        attempts.push("attempt");
+        throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: false });
+      } },
+    });
+
+    const result = await reviewPullRequest(options);
+
+    expect(attempts).toHaveLength(1);
+    expect(result.results).toMatchObject([{
+      path: firstPath,
+      status: "warning",
+      failure: { stage: "model-request", reason: "MODEL_REQUEST_FAILED" },
+    }]);
+    expect(comments[0].body).toContain("찰싹봇 리뷰 경고");
+  });
+
+  it("does not retry model-response failures even when marked retryable", async () => {
+    const attempts = [];
+    const { options, comments } = reviewOptions({
+      openCodeClient: { review: async () => {
+        attempts.push("attempt");
+        throw new ReviewFailure({ stage: "model-response", reason: "MODEL_RESPONSE_INVALID", detail: "safe", retryable: true });
+      } },
+    });
+
+    const result = await reviewPullRequest(options);
+
+    expect(attempts).toHaveLength(1);
+    expect(result.results).toMatchObject([{
+      path: firstPath,
+      status: "warning",
+      failure: { stage: "model-response", reason: "MODEL_RESPONSE_INVALID" },
+    }]);
+    expect(comments[0].body).toContain("찰싹봇 리뷰 경고");
+  });
+
   it("turns invalid source permalink configuration into a sanitized file warning", async () => {
     const { options, comments, completed } = reviewOptions({ serverUrl: "http://github.example" });
 
@@ -1045,6 +1127,38 @@ describe("opencode-review CLI", () => {
       readFile: options.readFile,
     });
 
+    expect(outcome.exitCode).toBe(1);
+    expect(completed[0].conclusion).toBe("success");
+    expect(statuses.map(({ state }) => state)).toEqual(["pending", "failure"]);
+  });
+
+  it("retries twice and fails the review gate when both model requests are retryable failures", async () => {
+    const { options, completed, statuses } = reviewOptions();
+    let attempts = 0;
+
+    const outcome = await main({
+      mascotUrl,
+      argv: ["--base", "base", "--head", "head", "--pull-number", "42"],
+      env: {
+        GITHUB_REPOSITORY: "example/leetdash",
+        GITHUB_TOKEN: "github-secret",
+        GITHUB_SERVER_URL: "https://github.example",
+        GITHUB_RUN_ID: "9",
+        GITHUB_RUN_ATTEMPT: "1",
+        OPENCODE_API_KEY: "opencode-secret",
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
+      },
+      loadReviewScope: async () => ({ submissionOnly: true, changedFiles: [{ status: "A", path: firstPath }] }),
+      githubClient: options.githubClient,
+      openCodeClient: { review: async () => {
+        attempts += 1;
+        throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: true });
+      } },
+      catalog,
+      readFile: options.readFile,
+    });
+
+    expect(attempts).toBe(2);
     expect(outcome.exitCode).toBe(1);
     expect(completed[0].conclusion).toBe("success");
     expect(statuses.map(({ state }) => state)).toEqual(["pending", "failure"]);
