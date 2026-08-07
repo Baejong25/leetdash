@@ -19,11 +19,18 @@ describe("DeepSeek status workflow permissions", () => {
 });
 
 describe("DeepSeek status workflow status publishing", () => {
-  it("runs the status probe and publishes badge JSON to status-data", () => {
-    expect(workflow).toContain("node scripts/check-ai-review-status.mjs --out status");
+  it("runs the status probe into RUNNER_TEMP and publishes badge JSON to status-data", () => {
+    expect(workflow).toContain("node scripts/check-ai-review-status.mjs");
+    expect(workflow).toContain('node scripts/check-ai-review-status.mjs --out "$RUNNER_TEMP/status"');
     expect(workflow).toContain("OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}");
+    expect(workflow).toContain('cp "$RUNNER_TEMP/status/gateway-status.json" status/');
+    expect(workflow).toContain('cp "$RUNNER_TEMP/status/deepseek-flash-status.json" status/');
     expect(workflow).toContain("git add status/");
     expect(workflow).toContain("git push origin status-data");
+  });
+
+  it("never writes probe output into the repo tree before the branch switch", () => {
+    expect(workflow).not.toContain("--out status");
   });
 
   it("self-bootstraps the status-data branch without blocking or empty commits", () => {

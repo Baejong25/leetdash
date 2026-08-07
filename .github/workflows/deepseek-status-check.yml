@@ -26,10 +26,10 @@ jobs:
         with:
           node-version: 20
       - name: Run status probes
-        run: node scripts/check-ai-review-status.mjs --out status
+        run: node scripts/check-ai-review-status.mjs --out "$RUNNER_TEMP/status"
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-      - name: Publish status to status-data branch
+      - name: Switch to status-data branch
         run: |
           git fetch origin status-data:refs/remotes/origin/status-data 2>/dev/null || true
           if git rev-parse --verify -q origin/status-data >/dev/null 2>&1; then
@@ -40,6 +40,11 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Publish status to status-data branch
+        run: |
+          mkdir -p status
+          cp "$RUNNER_TEMP/status/gateway-status.json" status/
+          cp "$RUNNER_TEMP/status/deepseek-flash-status.json" status/
           git add status/
           if git diff --cached --quiet; then
             echo "No status change."
