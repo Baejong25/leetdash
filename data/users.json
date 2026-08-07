@@ -29,6 +29,12 @@
 			"displayName": "박상준",
 			"githubUsername": "jun795",
 			"active": true
+		},
+		{
+			"id": "jiwanne",
+			"displayName": "김지원",
+			"githubUsername": "jiwanne",
+			"active": true
 		}
     ]
 }
