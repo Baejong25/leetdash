@@ -13,6 +13,16 @@ describe("user profile routes", () => {
   it("encodes user IDs before placing them in the URL", () => {
     expect(getUserProfileHref("user/name", "/leetdash/")).toBe("/leetdash/users/user%2Fname/");
   });
+
+  it("never produces a double basePath when consumed by Next Link (explicit empty basePath)", () => {
+    const linkHref = getUserProfileHref("mygo", "");
+    const prefixed = getUserProfileHref("mygo", "/leetdash");
+
+    expect(linkHref).toBe("/users/mygo/");
+    expect(prefixed).toBe("/leetdash/users/mygo/");
+    expect(prefixed).not.toContain("/leetdash/leetdash/");
+    expect(linkHref).not.toContain("/leetdash/leetdash/");
+  });
 });
 
 describe("problem comparison routes", () => {
