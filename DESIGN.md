@@ -19,6 +19,7 @@ All colors are light-only. No dark mode tokens exist; do not invent them.
 | Surface/muted | `--surface-muted` | `#eef1f4` | Progress bar track, neutral badges, hover bg |
 | Text/primary | `--text` | `#18202a` | Body text, headings, brand |
 | Text/secondary | `--muted` | `#637083` | Captions, labels, subdued text |
+| Text/secondary-strong | `--muted-strong` | `#586674` | Neutral badge text, secondary text on muted surfaces needing WCAG AA contrast |
 | Border/default | `--border` | `#d9dee7` | Card borders, table cell dividers |
 | Border/strong | `--strong-border` | `#b9c2cf` | Button borders, select borders |
 | Accent/primary | `--accent` | `#0f766e` | CTAs, links, focus outlines, bar fills, eyebrow |

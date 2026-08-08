@@ -4,6 +4,7 @@
   --surface-muted: #eef1f4;
   --text: #18202a;
   --muted: #637083;
+  --muted-strong: #586674;
   --border: #d9dee7;
   --strong-border: #b9c2cf;
   --accent: #0f766e;
@@ -613,7 +614,7 @@ tr:last-child td {
 
 .badge.neutral {
   background: var(--surface-muted);
-  color: #576574; /* 4.73:1 contrast on --surface-muted, exceeds WCAG AA 4.5:1 */
+  color: var(--muted-strong);
 }
 
 .empty {
