@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,6 +76,42 @@ function getRepositoryUrl() {
     normalizeRepositoryUrl(process.env.URL) ??
     (process.env.GITHUB_REPOSITORY ? `https://github.com/${process.env.GITHUB_REPOSITORY}` : undefined)
   );
+}
+
+function parseCentralRepository(value) {
+  const normalized = normalizeRepositoryUrl(value);
+  const match = normalized?.match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)$/);
+  return match ? { owner: match[1], repo: match[2] } : undefined;
+}
+
+function normalizeSourceRevision(value) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return /^[a-f0-9]{40}$/i.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+async function getSolutionAssetMetadata(solutionPath) {
+  const repository = parseCentralRepository(getRepositoryUrl());
+  const revision = normalizeSourceRevision(process.env.SOURCE_REVISION);
+  if (!solutionPath || !repository || !revision) {
+    return undefined;
+  }
+
+  try {
+    const fileBytes = await readFile(path.join(repoRoot, solutionPath));
+    const encodedPath = encodeBlobPath(solutionPath);
+    return {
+      solutionRawUrl: `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/${revision}/${encodedPath}`,
+      solutionPermalink: `https://github.com/${repository.owner}/${repository.repo}/blob/${revision}/${encodedPath}`,
+      solutionPathKey: createHash("sha256").update(solutionPath, "utf8").digest("hex"),
+      solutionContentKey: createHash("sha256").update(fileBytes).digest("hex"),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function blobUrl(relativePath) {
@@ -392,6 +429,7 @@ async function collectUserSubmissions({ user, submissionTargets, allPaths, gener
         solutionPath,
         readmePath,
         githubUrl: solutionPath ? blobUrl(solutionPath) : undefined,
+        ...(await getSolutionAssetMetadata(solutionPath)),
         source: "solution-file",
         submittedAt,
         generatedAt,
@@ -419,6 +457,7 @@ async function collectUserSubmissions({ user, submissionTargets, allPaths, gener
       solutionPath,
       readmePath,
       githubUrl: blobUrl(solutionPath ?? metaPath),
+      ...(await getSolutionAssetMetadata(solutionPath)),
       source: parsed.invalid ? "invalid-meta" : "meta",
       submittedAt,
       rawMeta: parsed.rawMeta,

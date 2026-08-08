@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,6 +8,10 @@ import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = path.resolve(__dirname, "..", "scripts", "build-progress.mjs");
+
+function sha256Hex(value: string | Buffer) {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 async function writeJson(filePath: string, value: unknown) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
@@ -331,6 +336,156 @@ describe("build-progress", () => {
       sourceKey: "top-interview-easy",
       submissionKey: "1",
       submittedAt: "2024-02-03T04:05:06.000Z",
+    });
+  });
+
+  it("exposes commit-pinned raw and blob URLs with exact SHA-256 keys for central solutions", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "progress-assets-"));
+    await mkdir(path.join(repo, "data"), { recursive: true });
+    await mkdir(path.join(repo, "submissions", "ada", "top-interview-easy", "1"), { recursive: true });
+    await mkdir(path.join(repo, "submissions", "ada", "top interview", "2"), { recursive: true });
+
+    await writeJson(path.join(repo, "data", "problem-catalog.json"), {
+      problems: [
+        { provider: "leetcode", problemId: "1", problemKey: "leetcode:1", slug: "two-sum", title: "Two Sum", difficulty: "easy" },
+        {
+          provider: "leetcode",
+          problemId: "2",
+          problemKey: "leetcode:2",
+          slug: "add-two-numbers",
+          title: "Add Two Numbers",
+          difficulty: "medium",
+        },
+      ],
+      lists: [
+        { key: "top-interview-easy", items: [{ problemKey: "leetcode:1", order: 1, section: "Array", submissionKey: "1" }] },
+        { key: "top interview", items: [{ problemKey: "leetcode:2", order: 1, section: "List", submissionKey: "2" }] },
+      ],
+    });
+    await writeJson(path.join(repo, "data", "users.json"), {
+      users: [{ id: "ada", displayName: "Ada Lovelace", githubUsername: "ada" }],
+    });
+    await writeFile(path.join(repo, "submissions", "ada", "top-interview-easy", "1", "solution.ts"), "// a\r\n// b\n");
+    await writeFile(path.join(repo, "submissions", "ada", "top interview", "2", "Solution.java"), "class Solution {}\n");
+
+    const revision = "0123456789abcdef0123456789abcdef01234567";
+    await execFileAsync(process.execPath, [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        SOURCE_REPOSITORY_URL: "https://github.com/example/progress",
+        BRANCH: "master",
+        SOURCE_REVISION: revision,
+      },
+    });
+
+    const progress = JSON.parse(await readFile(path.join(repo, "data", "progress.json"), "utf8"));
+    const submissions = new Map(
+      progress.users[0].submissions.map((item: { problemKey: string }) => [item.problemKey, item]),
+    );
+
+    expect(submissions.get("leetcode:1")).toMatchObject({
+      solutionPath: "submissions/ada/top-interview-easy/1/solution.ts",
+      solutionRawUrl: `https://raw.githubusercontent.com/example/progress/${revision}/submissions/ada/top-interview-easy/1/solution.ts`,
+      solutionPermalink: `https://github.com/example/progress/blob/${revision}/submissions/ada/top-interview-easy/1/solution.ts`,
+      solutionPathKey: sha256Hex("submissions/ada/top-interview-easy/1/solution.ts"),
+      solutionContentKey: sha256Hex(Buffer.from("// a\r\n// b\n")),
+      githubUrl: "https://github.com/example/progress/blob/master/submissions/ada/top-interview-easy/1/solution.ts",
+    });
+
+    expect(submissions.get("leetcode:2")).toMatchObject({
+      solutionPath: "submissions/ada/top interview/2/Solution.java",
+      solutionRawUrl: `https://raw.githubusercontent.com/example/progress/${revision}/submissions/ada/top%20interview/2/Solution.java`,
+      solutionPermalink: `https://github.com/example/progress/blob/${revision}/submissions/ada/top%20interview/2/Solution.java`,
+      solutionPathKey: sha256Hex("submissions/ada/top interview/2/Solution.java"),
+      solutionContentKey: sha256Hex(Buffer.from("class Solution {}\n")),
+      githubUrl: "https://github.com/example/progress/blob/master/submissions/ada/top%20interview/2/Solution.java",
+    });
+  });
+
+  it("omits solution asset URLs when SOURCE_REVISION is missing or invalid without failing the build", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "progress-revision-"));
+    await mkdir(path.join(repo, "data"), { recursive: true });
+    await mkdir(path.join(repo, "submissions", "ada", "top-interview-easy", "1"), { recursive: true });
+
+    await writeJson(path.join(repo, "data", "problem-catalog.json"), {
+      problems: [
+        { provider: "leetcode", problemId: "1", problemKey: "leetcode:1", slug: "two-sum", title: "Two Sum", difficulty: "easy" },
+      ],
+      lists: [{ key: "top-interview-easy", items: [{ problemKey: "leetcode:1", order: 1, section: "Array", submissionKey: "1" }] }],
+    });
+    await writeJson(path.join(repo, "data", "users.json"), {
+      users: [{ id: "ada", displayName: "Ada Lovelace", githubUsername: "ada" }],
+    });
+    await writeFile(path.join(repo, "submissions", "ada", "top-interview-easy", "1", "solution.ts"), "// solved\n");
+
+    const baseEnv = { ...process.env, SOURCE_REPOSITORY_URL: "https://github.com/example/progress", BRANCH: "master" };
+    const invalidRevisions = ["abc/def", "abc\ndef", "1234567890abcdef1234567890abcdef1234567", "z".repeat(40)];
+
+    for (const revision of [undefined, ...invalidRevisions]) {
+      await execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: revision === undefined ? baseEnv : { ...baseEnv, SOURCE_REVISION: revision },
+      });
+
+      const progress = JSON.parse(await readFile(path.join(repo, "data", "progress.json"), "utf8"));
+      const submission = progress.users[0].submissions[0];
+      expect(submission.solutionRawUrl).toBeUndefined();
+      expect(submission.solutionPermalink).toBeUndefined();
+      expect(submission.solutionPathKey).toBeUndefined();
+      expect(submission.solutionContentKey).toBeUndefined();
+      expect(submission.githubUrl).toBe(
+        "https://github.com/example/progress/blob/master/submissions/ada/top-interview-easy/1/solution.ts",
+      );
+    }
+
+    await execFileAsync(process.execPath, [scriptPath], {
+      cwd: repo,
+      env: { ...baseEnv, SOURCE_REVISION: "0123456789ABCDEF0123456789ABCDEF01234567" },
+    });
+    const progress = JSON.parse(await readFile(path.join(repo, "data", "progress.json"), "utf8"));
+    expect(progress.users[0].submissions[0]).toMatchObject({
+      solutionRawUrl:
+        "https://raw.githubusercontent.com/example/progress/0123456789abcdef0123456789abcdef01234567/submissions/ada/top-interview-easy/1/solution.ts",
+      solutionPermalink:
+        "https://github.com/example/progress/blob/0123456789abcdef0123456789abcdef01234567/submissions/ada/top-interview-easy/1/solution.ts",
+    });
+  });
+
+  it("keeps generated progress metadata-only without any source body", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "progress-nobody-"));
+    await mkdir(path.join(repo, "data"), { recursive: true });
+    await mkdir(path.join(repo, "submissions", "ada", "top-interview-easy", "1"), { recursive: true });
+
+    await writeJson(path.join(repo, "data", "problem-catalog.json"), {
+      problems: [
+        { provider: "leetcode", problemId: "1", problemKey: "leetcode:1", slug: "two-sum", title: "Two Sum", difficulty: "easy" },
+      ],
+      lists: [{ key: "top-interview-easy", items: [{ problemKey: "leetcode:1", order: 1, section: "Array", submissionKey: "1" }] }],
+    });
+    await writeJson(path.join(repo, "data", "users.json"), {
+      users: [{ id: "ada", displayName: "Ada Lovelace", githubUsername: "ada" }],
+    });
+    const body = "const secretBody = 'fragile'; // leetdash-no-bundle\n";
+    await writeFile(path.join(repo, "submissions", "ada", "top-interview-easy", "1", "solution.ts"), body);
+
+    await execFileAsync(process.execPath, [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        SOURCE_REPOSITORY_URL: "https://github.com/example/progress",
+        SOURCE_REVISION: "0123456789abcdef0123456789abcdef01234567",
+      },
+    });
+
+    const serialized = await readFile(path.join(repo, "data", "progress.json"), "utf8");
+    expect(serialized).not.toContain(body);
+    expect(serialized).not.toContain("secretBody");
+
+    const progress = JSON.parse(serialized);
+    expect(progress.users[0].submissions[0]).toMatchObject({
+      solutionRawUrl: expect.stringContaining("solution.ts"),
+      solutionContentKey: sha256Hex(Buffer.from(body)),
     });
   });
 });
