@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "LeetCode 진행 레이더",
   description: "GitHub 저장소 기반 LeetCode 스터디 진행 현황 대시보드",
   icons: {
-    icon: "/chalsakbot.png",
+    icon: "/favicon.svg",
   },
 };
 

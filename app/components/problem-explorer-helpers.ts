@@ -20,8 +20,9 @@ export type SelectionOutcome =
 /**
  * Resolve a `?user=` query parameter against the problem detail.
  *
- * - `null` (param absent) → first solver when solvers exist, otherwise `no-query`.
- *   The caller must not steal focus for this default selection.
+ * - `null` (param absent, SSR default) → first solver when solvers exist,
+ *   otherwise `no-query`. The caller must not steal focus for this default
+ *   selection. This is the server-renderable path that avoids Suspense.
  * - `""` (explicit empty param, e.g. `?user=`) → `unknown-user` — explicit
  *   invalid request, never silently default.
  * - A registered solver ID → `selected-solver` with that solver's data.
@@ -34,7 +35,10 @@ export function resolveSelection(
   detail: ProblemSolutionDetail,
 ): SelectionOutcome {
   if (query === null) {
-    return { kind: "no-query" };
+    const firstSolver = detail.solvers[0];
+    return firstSolver
+      ? { kind: "selected-solver", solver: firstSolver }
+      : { kind: "no-query" };
   }
 
   if (query === "") {

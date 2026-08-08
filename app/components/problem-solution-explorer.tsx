@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type SolutionCodeViewerState,
@@ -17,6 +16,7 @@ import { statusLabel } from "@/lib/format";
 import type { ProblemSolutionDetail } from "@/lib/problem-solutions";
 import { loadRawSource, type RawLoadResult } from "@/lib/raw-source-loader";
 import { isAbortError, type LineReference } from "@/lib/solution-assets";
+import { useClientQuery } from "@/app/components/use-client-query";
 import styles from "./problem-solution-explorer.module.css";
 
 export function ProblemSolutionExplorer({
@@ -24,9 +24,7 @@ export function ProblemSolutionExplorer({
 }: {
   detail: ProblemSolutionDetail;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const query = searchParams.get("user");
+  const [query, handleSelectUser] = useClientQuery();
 
   const outcome = useMemo(() => resolveSelection(query, detail), [query, detail]);
   const unsolvedUsers = useMemo(
@@ -120,12 +118,12 @@ export function ProblemSolutionExplorer({
   }, [outcome]);
 
   // ── Handlers ──
-  const handleSelectUser = useCallback(
+  const onSelectUser = useCallback(
     (userId: string) => {
       userInitiatedRef.current = true;
-      router.replace(`?user=${encodeURIComponent(userId)}`, { scroll: false });
+      handleSelectUser(userId);
     },
-    [router],
+    [handleSelectUser],
   );
 
   const handleReviewFocus = useCallback(
@@ -254,7 +252,7 @@ export function ProblemSolutionExplorer({
           detail={detail}
           unsolvedUsers={unsolvedUsers}
           selectedUserId={selectedUserId}
-          onSelectUser={handleSelectUser}
+          onSelectUser={onSelectUser}
         />
       </div>
     </div>

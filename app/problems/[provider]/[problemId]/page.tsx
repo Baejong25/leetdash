@@ -1,7 +1,6 @@
 import { type Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { ProblemSolutionExplorer } from "@/app/components/problem-solution-explorer";
 import { difficultyLabel } from "@/lib/format";
 import {
@@ -96,44 +95,8 @@ export default async function ProblemComparisonPage({
         </div>
       </div>
 
-      <Suspense
-        fallback={
-          <LoadingShell
-            userCount={detail.users.length}
-            solverCount={detail.solvers.length}
-          />
-        }
-      >
-        <ProblemSolutionExplorer detail={detail} />
-      </Suspense>
+      <ProblemSolutionExplorer detail={detail} />
     </div>
   );
 }
 
-function LoadingShell({
-  userCount,
-  solverCount,
-}: {
-  userCount: number;
-  solverCount: number;
-}) {
-  return (
-    <div>
-      <section className="panel" aria-label="풀이 선택 안내">
-        <div className="empty">아래 목록에서 풀이를 선택해 주세요.</div>
-      </section>
-
-      <section className="panel" aria-label="사용자별 풀이 현황">
-        <div className="panel-header">
-          <div>
-            <h2>풀이 현황</h2>
-            <p className="panel-subtitle">
-              등록 사용자 {userCount}명 중 {solverCount}명이 풀이를 제출했습니다
-            </p>
-          </div>
-        </div>
-        <div className="empty">불러오는 중…</div>
-      </section>
-    </div>
-  );
-}
