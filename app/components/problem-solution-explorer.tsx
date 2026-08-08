@@ -17,6 +17,7 @@ import { statusLabel } from "@/lib/format";
 import type { ProblemSolutionDetail } from "@/lib/problem-solutions";
 import { loadRawSource, type RawLoadResult } from "@/lib/raw-source-loader";
 import { isAbortError, type LineReference } from "@/lib/solution-assets";
+import styles from "./problem-solution-explorer.module.css";
 
 export function ProblemSolutionExplorer({
   detail,
@@ -147,101 +148,111 @@ export function ProblemSolutionExplorer({
 
   // ── Render ──
   return (
-    <div>
-      <ProblemSolverTable
-        detail={detail}
-        unsolvedUsers={unsolvedUsers}
-        selectedUserId={selectedUserId}
-        onSelectUser={handleSelectUser}
-      />
-
-      {/* ── Unknown user error ── */}
-      {outcome.kind === "unknown-user" && (
-        <section className="panel" aria-label="알 수 없는 사용자">
-          <div className="panel-header">
-            <h2
-              ref={headingRef}
-              tabIndex={-1}
-              data-testid="unknown-user-heading"
-              className="error-heading"
-            >
-              알 수 없는 사용자
-            </h2>
-          </div>
-          <div className="error-message" data-testid="unknown-user-message">
-            <code>{outcome.rawQuery}</code>님은 이 문제의 등록된 사용자가 아닙니다.
-          </div>
-        </section>
-      )}
-
-      {/* ── Selected unsolved detail ── */}
-      {outcome.kind === "selected-unsolved" && (
-        <section className="panel" aria-label="미제출 사용자">
-          <div className="panel-header">
-            <h2 ref={headingRef} tabIndex={-1} data-testid="unsolved-heading">
-              {outcome.user.displayName} — 아직 풀지 않은 문제
-            </h2>
-          </div>
-          <div className="unsolved-detail">
-            <p>
-              <a
-                className="github-link"
-                href={getGithubProfileUrl(outcome.user.githubUsername)}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                @{outcome.user.githubUsername}
-              </a>
-            </p>
-            <SolutionCodeViewer
-              state={{ status: "unsolved" }}
-              permalink={null}
-            />
-          </div>
-        </section>
-      )}
-
-      {/* ── Selected solver detail ── */}
-      {outcome.kind === "selected-solver" && selectedSolver && (
-        <div>
-          <section className="panel" aria-label="선택한 풀이">
+    <div className={styles.explorerRoot}>
+      <div className={styles.detailSection}>
+        {/* ── Unknown user error ── */}
+        {outcome.kind === "unknown-user" && (
+          <section className="panel" aria-label="알 수 없는 사용자">
             <div className="panel-header">
               <h2
                 ref={headingRef}
                 tabIndex={-1}
-                data-testid="solver-heading"
-                aria-current="true"
+                data-testid="unknown-user-heading"
               >
-                {selectedSolver.user.displayName}의 풀이
+                알 수 없는 사용자
               </h2>
-              <div className="solver-meta">
-                <span
-                  className={`badge ${statusBadgeClass(selectedSolver.submission.status)}`}
-                >
-                  {statusLabel(selectedSolver.submission.status)}
-                </span>
-                {selectedSolver.submission.language && (
-                  <span className="badge neutral">
-                    {selectedSolver.submission.language}
-                  </span>
-                )}
-              </div>
+            </div>
+            <div className="empty" data-testid="unknown-user-message">
+              <code>{outcome.rawQuery}</code>님은 이 문제의 등록된 사용자가 아닙니다.
             </div>
           </section>
+        )}
 
-          <div className="explorer-detail-layout">
-            <SolutionCodeViewer
-              state={displayViewerState}
-              permalink={selectedSolver.submission.solutionPermalink ?? null}
-            />
-            <SolutionReviewPanel
-              pathKey={selectedSolver.submission.solutionPathKey ?? null}
-              contentKey={selectedSolver.submission.solutionContentKey ?? null}
-              onFocusLine={handleReviewFocus}
-            />
+        {/* ── Selected unsolved detail ── */}
+        {outcome.kind === "selected-unsolved" && (
+          <section className="panel" aria-label="미제출 사용자">
+            <div className="panel-header">
+              <h2 ref={headingRef} tabIndex={-1} data-testid="unsolved-heading">
+                {outcome.user.displayName} — 아직 풀지 않은 문제
+              </h2>
+            </div>
+            <div className="unsolved-detail">
+              <p>
+                <a
+                  className="github-link"
+                  href={getGithubProfileUrl(outcome.user.githubUsername)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  @{outcome.user.githubUsername}
+                </a>
+              </p>
+              <SolutionCodeViewer
+                state={{ status: "unsolved" }}
+                permalink={null}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* ── Selected solver detail ── */}
+        {outcome.kind === "selected-solver" && selectedSolver && (
+          <div>
+            <section
+              className={`${styles.selectedSummary} panel`}
+              aria-label="선택한 풀이"
+            >
+              <div className="panel-header">
+                <h2
+                  ref={headingRef}
+                  tabIndex={-1}
+                  data-testid="solver-heading"
+                  aria-current="true"
+                >
+                  {selectedSolver.user.displayName}의 풀이
+                </h2>
+                <div className="solver-meta">
+                  <span
+                    className={`badge ${statusBadgeClass(selectedSolver.submission.status)}`}
+                  >
+                    {statusLabel(selectedSolver.submission.status)}
+                  </span>
+                  {selectedSolver.submission.language && (
+                    <span className="badge neutral">
+                      {selectedSolver.submission.language}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <div className={styles.explorerDetailLayout}>
+              <div className={styles.codeColumn}>
+                <SolutionCodeViewer
+                  state={displayViewerState}
+                  permalink={selectedSolver.submission.solutionPermalink ?? null}
+                />
+              </div>
+              <div className={styles.reviewColumn}>
+                <SolutionReviewPanel
+                  pathKey={selectedSolver.submission.solutionPathKey ?? null}
+                  contentKey={selectedSolver.submission.solutionContentKey ?? null}
+                  onFocusLine={handleReviewFocus}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      <div className={styles.solverSection}>
+        <ProblemSolverTable
+          detail={detail}
+          unsolvedUsers={unsolvedUsers}
+          selectedUserId={selectedUserId}
+          onSelectUser={handleSelectUser}
+        />
+      </div>
     </div>
   );
 }

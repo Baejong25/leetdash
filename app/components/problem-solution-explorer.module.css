@@ -1,0 +1,59 @@
+/* ── Problem Solution Explorer Layout ────────────────────────────────────── */
+
+/* Flex column root: detail (code+review) first, solver table second */
+.explorerRoot {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Detail section (summary + code + review) ── */
+.detailSection {
+  min-width: 0;
+}
+
+/* ── Solver table section ── */
+.solverSection {
+  min-width: 0;
+}
+
+/* ── Desktop: code-first split view (>900px) ── */
+.explorerDetailLayout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+/* Code column: must allow shrinkage to prevent overflow */
+.codeColumn {
+  min-width: 0;
+}
+
+/* Review column: sticky so it stays visible while scrolling long code */
+.reviewColumn {
+  align-self: start;
+  position: sticky;
+  top: 82px; /* 64px header + 18px breathing room */
+}
+
+/* Selected summary panel wrapper */
+.selectedSummary {
+  margin-bottom: 18px;
+}
+
+/* ── Tablet / Mobile: single column stack (≤900px) ── */
+@media (max-width: 900px) {
+  .explorerDetailLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewColumn {
+    position: static;
+  }
+}
+
+/* ── ≤640px: prevent document horizontal overflow ── */
+@media (max-width: 640px) {
+  .explorerRoot {
+    overflow-x: clip;
+  }
+}
