@@ -3,6 +3,7 @@
 import type { ProblemDetailUser, ProblemSolver } from "@/lib/problem-solutions";
 import { getGithubProfileUrl } from "@/lib/github";
 import { formatDateTime, statusLabel } from "@/lib/format";
+import styles from "./problem-solver-table.module.css";
 
 // ── Helpers ──
 
@@ -146,7 +147,7 @@ export function ProblemSolverTable({
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className={styles.solverTable}>
           <thead>
             <tr>
               <th>사용자</th>

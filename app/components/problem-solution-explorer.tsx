@@ -1,11 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type SolutionCodeViewerState,
 } from "@/app/components/solution-code-viewer-helpers";
-import { SolutionCodeViewer } from "@/app/components/solution-code-viewer";
-import { SolutionReviewPanel } from "@/app/components/solution-review-panel";
 import {
   mapRawResultToViewerState,
   resolveSelection,
@@ -18,6 +17,16 @@ import { loadRawSource, type RawLoadResult } from "@/lib/raw-source-loader";
 import { isAbortError, type LineReference } from "@/lib/solution-assets";
 import { useClientQuery } from "@/app/components/use-client-query";
 import styles from "./problem-solution-explorer.module.css";
+
+const SolutionCodeViewer = dynamic(
+  () => import("@/app/components/solution-code-viewer").then((m) => ({ default: m.SolutionCodeViewer })),
+  { ssr: true },
+);
+
+const SolutionReviewPanel = dynamic(
+  () => import("@/app/components/solution-review-panel").then((m) => ({ default: m.SolutionReviewPanel })),
+  { ssr: true },
+);
 
 export function ProblemSolutionExplorer({
   detail,
@@ -34,6 +43,24 @@ export function ProblemSolutionExplorer({
     },
     [detail],
   );
+
+  // ── Stable selected-identity key for source-loading effect ──
+  // Derived from outcome so the effect only re-fires when the actual
+  // solver/user changes, not when useClientQuery resolves null→same-solver.
+  const sourceKey = useMemo(() => {
+    switch (outcome.kind) {
+      case "selected-solver": {
+        const s = outcome.solver;
+        return `s:${s.user.id}:${s.submission.solutionRawUrl ?? ""}:${s.submission.solutionContentKey ?? ""}`;
+      }
+      case "selected-unsolved":
+        return `u:${outcome.user.id}`;
+      case "no-query":
+        return "nq";
+      case "unknown-user":
+        return `??:${outcome.rawQuery}`;
+    }
+  }, [outcome]);
 
   // ── Source loading state ──
   const [viewerState, setViewerState] = useState<SolutionCodeViewerState>({
@@ -98,7 +125,7 @@ export function ProblemSolutionExplorer({
       if (isAbortError(error)) return;
       setViewerState({ status: "error" });
     });
-  }, [outcome]);
+  }, [sourceKey]);
 
   // Cleanup on unmount
   useEffect(() => {

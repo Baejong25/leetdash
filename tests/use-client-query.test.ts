@@ -1,5 +1,5 @@
 /**
- * @vitest-environment happy-dom
+ * @vitest-environment jsdom
  *
  * Tests for useClientQuery hook — SSR-safe URL query synchronisation
  * that replaces useSearchParams without Suspense.

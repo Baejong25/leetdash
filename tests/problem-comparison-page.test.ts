@@ -239,10 +239,11 @@ describe("problem comparison detail contract", () => {
     expect(source).not.toContain("data-testid=\"unsolved-user-row\"");
   });
 
-  it("uses chalsakbot.png as favicon, not transparent favicon.ico", () => {
+  it("uses a small visible favicon, not the 360 KB mascot or transparent favicon", () => {
     const layoutPath = join(import.meta.dirname ?? __dirname, "../app/layout.tsx");
     const layoutSource = readFileSync(layoutPath, "utf-8");
-    expect(layoutSource).toContain("chalsakbot.png");
+    expect(layoutSource).toContain("favicon.svg");
+    expect(layoutSource).not.toContain("chalsakbot.png");
     expect(layoutSource).not.toContain("favicon.ico");
   });
 });

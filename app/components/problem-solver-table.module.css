@@ -1,0 +1,28 @@
+.solverTable {
+  table-layout: fixed;
+}
+
+.solverTable th:nth-child(1),
+.solverTable td:nth-child(1) {
+  width: 22%;
+}
+
+.solverTable th:nth-child(2),
+.solverTable td:nth-child(2) {
+  width: 18%;
+}
+
+.solverTable th:nth-child(3),
+.solverTable td:nth-child(3) {
+  width: 16%;
+}
+
+.solverTable th:nth-child(4),
+.solverTable td:nth-child(4) {
+  width: 16%;
+}
+
+.solverTable th:nth-child(5),
+.solverTable td:nth-child(5) {
+  width: 28%;
+}

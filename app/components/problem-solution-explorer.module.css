@@ -14,6 +14,8 @@
 /* ── Solver table section ── */
 .solverSection {
   min-width: 0;
+  contain: layout;
+  min-height: 200px;
 }
 
 /* ── Desktop: code-first split view (>900px) ── */
@@ -26,6 +28,7 @@
 /* Code column: must allow shrinkage to prevent overflow */
 .codeColumn {
   min-width: 0;
+  min-height: 300px;
 }
 
 /* Review column: sticky so it stays visible while scrolling long code */
