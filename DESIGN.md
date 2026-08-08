@@ -247,34 +247,40 @@ The comparison page will use a code-first split view at ≥901px and a single-co
 - `.mono` — applies monospace font, 12px
 - `.lede` — lead paragraph: 15px, `--muted`, max-width 760px, line-height 1.55
 - `.eyebrow` — 12px, weight 760, `--accent`, uppercase, margin 0 0 8px
-- `.github-link` — hover: `--accent-strong`, underline, text-underline-offset 3px
+- `.github-link` — hover: `--accent-strong`, underline, text-underline-offset 3px; focus-visible: outline 2px `--accent`, outline-offset 2px, border-radius 3px
+- `.link-button` — transparent button reset (background: none, border: 0, cursor: pointer, font: inherit, padding: 0, text-align: inherit); focus-visible: outline 2px `--accent`, outline-offset 2px, border-radius 3px. Used in solver table rows for user name buttons.
+- `.solver-meta` — inline-flex row with flex-wrap: wrap, align-items: center, gap: 8px. Wraps badge groups in the selected solver summary header.
 
 ### Future Comparison Primitives (Section 5 extension)
 
-These components will be built in later tasks. Define their token contract here; do not implement styling with ad-hoc values.
+These components are implemented in `app/components/`. Their CSS modules use only documented tokens.
 
-#### Code Surface
-- **Purpose:** Displays selected solution source code with line numbers.
-- **States:** loading (skeleton/fade), loaded (code visible), error (fetch failure message), empty (no solution selected), oversized (≥256 KiB — reject source entirely; show error message with immutable GitHub permalink link; never render a truncated partial solution).
-- **Tokens:** Uses `--surface` background, `--border` dividers. Line numbers in `--muted` mono. Code text in `--text` mono. Selected/focused line highlight via `--accent-soft`.
-- **Scroll:** Horizontal scroll for long lines; container must not overflow the page. Vertical scroll with sticky header.
-- **Accessibility:** Semantic `<pre><code>`, ARIA live region for loading/error state changes.
+#### Comparison Explorer Layout (`problem-solution-explorer.module.css`)
 
-#### Solver Selector
-- **Purpose:** Dropdown or segmented control to pick which user's solution to view.
-- **States:** default (shows navigated user), empty (user has no solution — show message, offer solvers), expanded (dropdown open).
-- **Tokens:** Matches existing `.viewer-control select` pattern — border, radius, focus ring, min-height 38px.
-- **Accessibility:** `<label>` association, focus management.
+- **`explorerRoot`:** Flex column container. DOM order: `detailSection` (code+review) first, `solverSection` second — detail/code is visually first at all widths.
+- **`detailSection`:** First child; wraps the selected solver summary + code + review. Contains:
+  - **`selectedSummary`:** Panel wrapper for the solver name/badge header with `margin-bottom: 18px`.
+  - **`explorerDetailLayout`:** CSS grid at >900px: `minmax(0, 2fr) minmax(0, 1fr)` with `gap: 18px`. Code column is 2fr, review column is 1fr. At ≤900px, collapses to single column.
+- **`solverSection`:** Second child; wraps the `ProblemSolverTable`. Rendered below the detail section at all widths. `min-width: 0` to prevent overflow.
+- **`codeColumn`:** `min-width: 0` to prevent grid blowout from long code lines.
+- **`reviewColumn`:** `position: sticky; top: 82px` (64px header + 18px breathing room) on desktop. `position: static` on mobile.
+- **Overflow containment:** `.comparison-page` (scoped page class) gets `width: 100%; overflow-x: hidden` at ≤640px. `.top-nav` wraps (`flex-wrap: wrap`) at ≤640px to prevent the header nav from overflowing the document at narrow viewports. `.explorerRoot` also has `overflow-x: clip` at ≤640px. No bare `html`, `body`, or generic `.page` overflow rules are applied. Header navigation remains fully usable — content is never hidden or clipped to fake no-overflow.
 
-#### Review Item
-- **Purpose:** Displays matched review comment for the current code.
-- **States:**
-  - *absent*: no review exists on the source PR. Treated as neutral — show an empty informational placeholder.
-  - *matched*: path hash AND content hash match the current central-repository file. Display the review.
-  - *stale*: either hash mismatches — the review was written against different code. **Never** display stale review text. Render an error notice explaining the content has changed since the review was written, and display the immutable GitHub PR comment permalink for manual cross-reference. This is a `--danger`/error state, not informational.
-  - *sync-unavailable*: deploy-time review-sync step failed entirely (e.g., network outage, GitHub API rate limit). This is a `--warn`/warning state, semantically distinct from both absent and stale. Show a warning notice that reviews could not be loaded for this deploy; the page may be refreshed after the next successful deploy. Sync-unavailable must never block the Pages deploy.
-- **Tokens:** Uses `--surface-muted` background, `--border` separator. Reviewer attribution in `--muted` size. Review body in `--text`. Stale state: background switches to `--danger-soft`, text to `--danger`, border-color to `--danger`. Sync-unavailable: background switches to `--warn-soft`, text to `--warn`, border-color to `--warn`.
-- **Accessibility:** ARIA live region for state transitions.
+#### Code Surface (`solution-code-viewer.module.css`)
+
+- **Focus-visible:** `.copyButton` uses `border-color: var(--accent); outline: 2px solid var(--accent-soft)`. `.permalink` uses `outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px`.
+- **Reduced motion:** `@media (prefers-reduced-motion: reduce)` sets `animation: none; opacity: 0.4` on skeleton lines.
+- **Scroll containment:** `.scroller` has `overflow-x: auto; overflow-y: clip`. `.lineTable` uses `width: max-content` for horizontal code scrolling without pushing the panel wider.
+
+#### Review Panel (`solution-review-panel.module.css`)
+
+- **Focus-visible:** `.lineButton` uses `outline: 2px solid var(--accent); outline-offset: 1px`. `.commentLink` uses `outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px`.
+- **State colors:** Stale/error state uses `--danger-soft` background, `--danger` border and text. Sync-unavailable uses `--warn-soft` background, `--warn` border and text.
+
+### Reduced Motion (New)
+
+`prefers-reduced-motion: reduce` disables:
+- Skeleton pulse animation in code viewer (sets `animation: none; opacity: 0.4`)
 
 ## 6. Motion & Interaction
 
@@ -296,6 +302,15 @@ These components will be built in later tasks. Define their token contract here;
 | `.catalog-panel-toggle` | `outline: 2px solid var(--accent)`, `outline-offset: -2px` (focus-visible only) |
 | `.viewer-control select` | `border-color: var(--accent)`, `outline: 2px solid var(--accent-soft)` |
 | `.field input` | `border-color: var(--accent)`, `outline: 2px solid var(--accent-soft)` |
+| `.copyButton` | `border-color: var(--accent)`, `outline: 2px solid var(--accent-soft)` (focus-visible) |
+| `.permalink` | `outline: 2px solid var(--accent)`, `outline-offset: 2px`, `border-radius: 3px` (focus-visible) |
+| `.lineButton` | `outline: 2px solid var(--accent)`, `outline-offset: 1px` (focus-visible) |
+| `.commentLink` | `outline: 2px solid var(--accent)`, `outline-offset: 2px`, `border-radius: 3px` (focus-visible) |
+| `.github-link` | `outline: 2px solid var(--accent)`, `outline-offset: 2px`, `border-radius: 3px` (focus-visible) |
+| `.link-button` | `outline: 2px solid var(--accent)`, `outline-offset: 2px`, `border-radius: 3px` (focus-visible) |
+| `.problem-link` | `outline: 2px solid var(--accent)`, `outline-offset: 2px`, `border-radius: 3px` (focus-visible) |
+
+**Rule:** All `:focus-visible` outlines use `var(--accent)`. Never hide focus indicators; never use `transition-all`.
 
 ### Hover States (Existing)
 
