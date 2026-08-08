@@ -78,10 +78,59 @@ function getRepositoryUrl() {
   );
 }
 
+const githubCoordinatePattern = /^[A-Za-z0-9_.-]+$/;
+
 function parseCentralRepository(value) {
   const normalized = normalizeRepositoryUrl(value);
-  const match = normalized?.match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)$/);
-  return match ? { owner: match[1], repo: match[2] } : undefined;
+  if (!normalized) {
+    return undefined;
+  }
+
+  const rawPath = normalized.slice("https://github.com/".length);
+  if (rawPath.split("/").some((segment) => segment === "." || segment === "..")) {
+    return undefined;
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(normalized);
+  } catch {
+    return undefined;
+  }
+
+  if (
+    parsedUrl.protocol !== "https:"
+    || parsedUrl.hostname !== "github.com"
+    || parsedUrl.username
+    || parsedUrl.password
+    || parsedUrl.port
+    || parsedUrl.search
+    || parsedUrl.hash
+  ) {
+    return undefined;
+  }
+
+  const parts = parsedUrl.pathname.split("/");
+  if (parts.length !== 3 || parts[0] !== "") {
+    return undefined;
+  }
+
+  const coordinates = parts.slice(1).map((segment) => {
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return undefined;
+    }
+  });
+  if (
+    coordinates.some(
+      (segment) => !segment || segment === "." || segment === ".." || !githubCoordinatePattern.test(segment),
+    )
+  ) {
+    return undefined;
+  }
+
+  return { owner: coordinates[0], repo: coordinates[1] };
 }
 
 function normalizeSourceRevision(value) {

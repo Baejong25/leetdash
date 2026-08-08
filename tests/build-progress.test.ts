@@ -488,4 +488,102 @@ describe("build-progress", () => {
       solutionContentKey: sha256Hex(Buffer.from(body)),
     });
   });
+
+  it("strictly rejects malformed central repository URLs without emitting solution assets", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "progress-strict-"));
+    await mkdir(path.join(repo, "data"), { recursive: true });
+    await mkdir(path.join(repo, "submissions", "ada", "top-interview-easy", "1"), { recursive: true });
+
+    await writeJson(path.join(repo, "data", "problem-catalog.json"), {
+      problems: [
+        { provider: "leetcode", problemId: "1", problemKey: "leetcode:1", slug: "two-sum", title: "Two Sum", difficulty: "easy" },
+      ],
+      lists: [{ key: "top-interview-easy", items: [{ problemKey: "leetcode:1", order: 1, section: "Array", submissionKey: "1" }] }],
+    });
+    await writeJson(path.join(repo, "data", "users.json"), {
+      users: [{ id: "ada", displayName: "Ada Lovelace", githubUsername: "ada" }],
+    });
+    await writeFile(path.join(repo, "submissions", "ada", "top-interview-easy", "1", "solution.ts"), "// solved\n");
+
+    const baseEnv = { ...process.env, BRANCH: "master", SOURCE_REVISION: "0123456789abcdef0123456789abcdef01234567" };
+    const malformedUrls = [
+      "https://github.com/example/progress?x=1",
+      "https://github.com/example/progress#frag",
+      "https://github.com/example/progress%2Fevil",
+      "https://github.com/example/progress%5Cevil",
+      "https://github.com/example/progress%3Fx=1",
+      "https://github.com/example/progress%23frag",
+      "https://github.com/../repo",
+      "https://github.com/example/../progress",
+      "https://github.com/example/./progress",
+      "https://github.com/example/progress/..",
+      "https://github.com/example/progress/extra",
+      "https://github.com/example/progress/",
+      "https://github.com/example//progress",
+      "https://github.com/example/progress<x>",
+      "https://github.com/example/progress>evil",
+      "https://github.com/example/progress with space",
+      "https://user:pass@github.com/example/progress",
+      "https://github.com:443/example/progress",
+      "https://github.com/example/progress.git?x=1",
+      "not-a-url",
+      "https://example.com/owner/repo",
+    ];
+
+    for (const malformedUrl of malformedUrls) {
+      const { stdout, stderr } = await execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: { ...baseEnv, SOURCE_REPOSITORY_URL: malformedUrl },
+      });
+
+      const progress = JSON.parse(await readFile(path.join(repo, "data", "progress.json"), "utf8"));
+      const submission = progress.users[0].submissions[0];
+      expect(submission.solutionRawUrl).toBeUndefined();
+      expect(submission.solutionPermalink).toBeUndefined();
+      expect(submission.solutionPathKey).toBeUndefined();
+      expect(submission.solutionContentKey).toBeUndefined();
+
+      const logs = `${stdout}\n${stderr}`;
+      expect(logs).not.toContain(malformedUrl);
+    }
+  }, 30_000);
+
+  it("accepts normalized central repository coordinates with optional .git and SSH forms", async () => {    const repo = await mkdtemp(path.join(tmpdir(), "progress-accept-"));
+    await mkdir(path.join(repo, "data"), { recursive: true });
+    await mkdir(path.join(repo, "submissions", "ada", "top-interview-easy", "1"), { recursive: true });
+
+    await writeJson(path.join(repo, "data", "problem-catalog.json"), {
+      problems: [
+        { provider: "leetcode", problemId: "1", problemKey: "leetcode:1", slug: "two-sum", title: "Two Sum", difficulty: "easy" },
+      ],
+      lists: [{ key: "top-interview-easy", items: [{ problemKey: "leetcode:1", order: 1, section: "Array", submissionKey: "1" }] }],
+    });
+    await writeJson(path.join(repo, "data", "users.json"), {
+      users: [{ id: "ada", displayName: "Ada Lovelace", githubUsername: "ada" }],
+    });
+    await writeFile(path.join(repo, "submissions", "ada", "top-interview-easy", "1", "solution.ts"), "// solved\n");
+
+    const revision = "0123456789abcdef0123456789abcdef01234567";
+    const acceptedSources = [
+      "https://github.com/example/progress",
+      "https://github.com/example/progress.git",
+      "git@github.com:example/progress",
+    ];
+
+    for (const source of acceptedSources) {
+      await execFileAsync(process.execPath, [scriptPath], {
+        cwd: repo,
+        env: { ...process.env, BRANCH: "master", SOURCE_REVISION: revision, SOURCE_REPOSITORY_URL: source },
+      });
+
+      const progress = JSON.parse(await readFile(path.join(repo, "data", "progress.json"), "utf8"));
+      expect(progress.users[0].submissions[0]).toMatchObject({
+        solutionRawUrl: `https://raw.githubusercontent.com/example/progress/${revision}/submissions/ada/top-interview-easy/1/solution.ts`,
+        solutionPermalink: `https://github.com/example/progress/blob/${revision}/submissions/ada/top-interview-easy/1/solution.ts`,
+        solutionPathKey: sha256Hex("submissions/ada/top-interview-easy/1/solution.ts"),
+        solutionContentKey: sha256Hex(Buffer.from("// solved\n")),
+        githubUrl: "https://github.com/example/progress/blob/master/submissions/ada/top-interview-easy/1/solution.ts",
+      });
+    }
+  });
 });
