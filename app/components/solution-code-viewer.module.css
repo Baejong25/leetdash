@@ -63,8 +63,15 @@
   text-underline-offset: 3px;
 }
 
+.permalink:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .scroller {
   overflow-x: auto;
+  overflow-y: clip;
 }
 
 /* Ensures long lines scroll without pushing the panel wider */
@@ -160,6 +167,14 @@
 @keyframes skeletonPulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine:nth-child(odd),
+  .skeletonLine:nth-child(even) {
+    animation: none;
+    opacity: 0.4;
+  }
 }
 
 .copyStatus {
