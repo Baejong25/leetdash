@@ -3,6 +3,8 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow);
+  contain: layout paint;
+  min-height: 400px;
   overflow: hidden;
 }
 

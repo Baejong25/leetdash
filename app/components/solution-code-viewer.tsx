@@ -110,7 +110,7 @@ export function SolutionCodeViewer({
             type="button"
             className={styles.copyButton}
             onClick={handleCopy}
-            aria-label="소스 코드 복사"
+            aria-label="Copy 소스 코드 복사"
           >
             Copy
           </button>

@@ -613,7 +613,7 @@ tr:last-child td {
 
 .badge.neutral {
   background: var(--surface-muted);
-  color: var(--muted);
+  color: #576574; /* 4.73:1 contrast on --surface-muted, exceeds WCAG AA 4.5:1 */
 }
 
 .empty {
