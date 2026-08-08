@@ -66,7 +66,7 @@ export default async function ProblemComparisonPage({
   }
 
   return (
-    <div className="page">
+    <div className="page comparison-page">
       <div className="page-header">
         <div>
           <p className="eyebrow">
