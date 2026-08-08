@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 import { CatalogProblemList } from "@/app/components/catalog-problem-list";
+import { UserProblemActions } from "@/app/components/user-problem-actions";
 import { difficultyLabel, formatDate, statusLabel } from "@/lib/format";
 import { formatCatalogListTitle, formatCatalogSection, formatProblemTitle } from "@/lib/i18n";
+import { getComparisonLinkHref } from "@/lib/user-problem-comparison-link";
 import type { CatalogProblem, CatalogProvider } from "@/lib/catalog";
 import type { Submission } from "@/lib/types";
 
@@ -16,6 +17,7 @@ type ListItem = {
   submissionKey: string;
   problem: CatalogProblem;
   submission: Submission | null;
+  communitySolutionCount: number;
 };
 
 type ListData = {
@@ -43,6 +45,7 @@ type Props = {
     listKey: string;
     problemKey: string;
   } | null;
+  profileUserId: string;
 };
 
 const providerLabels = {
@@ -90,7 +93,7 @@ function getListProvider(items: ListItem[]): CatalogProvider {
   return items[0]?.problem?.provider ?? "leetcode";
 }
 
-export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }: Props) {
+export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, profileUserId }: Props) {
   const [difficultyFilters, setDifficultyFilters] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -196,6 +199,12 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }
                       const isFirstUnsolvedProblem =
                         firstUnsolvedProblemTarget?.listKey === list.key &&
                         firstUnsolvedProblemTarget.problemKey === item.problemKey;
+                      const comparisonHref = getComparisonLinkHref(
+                        item.problem.provider,
+                        item.problem.problemId,
+                        profileUserId,
+                        item.communitySolutionCount,
+                      );
 
                       return (
                         <tr
@@ -205,7 +214,13 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }
                         >
                           <td className="mono">{item.order}</td>
                           <td>
-                            <div className="problem-title">{formatProblemTitle(item.problem.title)}</div>
+                            {comparisonHref ? (
+                              <Link className="problem-link" href={comparisonHref}>
+                                {formatProblemTitle(item.problem.title)}
+                              </Link>
+                            ) : (
+                              <div className="problem-title">{formatProblemTitle(item.problem.title)}</div>
+                            )}
                             <div className="muted mono">{formatCatalogSection(item.section)}</div>
                           </td>
                           <td>
@@ -226,18 +241,12 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget }
                           <td className="mono">{item.submission?.language ?? "-"}</td>
                           <td>{formatDate(item.submission?.solvedAt)}</td>
                           <td>
-                            <div className="actions">
-                              <a className="button" href={item.problem.sourceUrl} target="_blank" rel="noreferrer">
-                                <ExternalLink size={16} aria-hidden="true" />
-                                {providerLabels[item.problem.provider]}
-                              </a>
-                              {item.submission?.githubUrl ? (
-                                <a className="button" href={item.submission.githubUrl} target="_blank" rel="noreferrer">
-                                  <ExternalLink size={16} aria-hidden="true" />
-                                  GitHub
-                                </a>
-                              ) : null}
-                            </div>
+                            <UserProblemActions
+                              problem={item.problem}
+                              submission={item.submission}
+                              comparisonHref={comparisonHref}
+                              providerLabels={providerLabels}
+                            />
                           </td>
                         </tr>
                       );

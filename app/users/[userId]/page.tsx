@@ -83,7 +83,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ use
         </div>
       </section>
 
-      <FilterableUserProblemLists lists={lists} firstUnsolvedProblemTarget={firstUnsolvedProblemTarget} />
+      <FilterableUserProblemLists lists={lists} firstUnsolvedProblemTarget={firstUnsolvedProblemTarget} profileUserId={user.id} />
 
     </div>
   );
