@@ -226,7 +226,9 @@ export async function loadRawSource(request: RawSourceRequest): Promise<RawLoadR
   const controller = new AbortController();
   const entry: InflightSource = {
     promise: fetchAndVerify(request, controller, key).finally(() => {
-      inflightSources.delete(key);
+      if (inflightSources.get(key) === entry) {
+        inflightSources.delete(key);
+      }
     }),
     callers: new Set<AbortSignal>(),
     controller,

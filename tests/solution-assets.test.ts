@@ -495,6 +495,75 @@ describe("lazy raw source loader", () => {
     }
     expect(calls).toHaveLength(1);
   });
+
+  it("never deletes a newer inflight entry when a stale request settles late", async () => {
+    const gen1Gate = deferred<void>();
+    const gen2Gate = deferred<void>();
+    let activeGen = 0;
+    const calls = mockFetch(() => {
+      activeGen += 1;
+      if (activeGen === 1) {
+        return gen1Gate.promise.then(() => textResponse("mismatched body"));
+      }
+      return gen2Gate.promise.then(() => textResponse(javaSource));
+    });
+
+    // Gen 1: aborted by caller. finish() deletes inflight entry and calls
+    // controller.abort(), but the plain mock ignores the signal.
+    // fetchAndVerify stays pending on gen1Gate.
+    const gen1Controller = new AbortController();
+    const gen1 = loadRawSource({ url: rawUrl, expectedContentKey: rawKey, signal: gen1Controller.signal });
+    await waitFor(() => calls.length === 1);
+    gen1Controller.abort();
+    expect(await gen1).toEqual({ status: "aborted" });
+
+    // Gen 2 fills gen1's slot. Still pending on gen2Gate.
+    const gen2 = loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    await waitFor(() => calls.length === 2);
+
+    // Make crypto.subtle.digest resolve synchronously via microtask so the
+    // entire fetchAndVerify → verifySha256 → .finally chain drains
+    // deterministically within microtask processing.
+    const original = globalThis.crypto;
+    const sha256 = createHash("sha256");
+    vi.stubGlobal("crypto", {
+      subtle: {
+        digest: vi.fn((_algo, bytes) => {
+          const h = sha256.copy().update(new Uint8Array(bytes as ArrayBuffer)).digest();
+          return Promise.resolve(h.buffer.slice(h.byteOffset, h.byteOffset + h.byteLength));
+        }),
+      },
+      getRandomValues: original.getRandomValues.bind(original),
+    });
+
+    // Resolve gen1's gate: gen1's fetchAndVerify proceeds through
+    // SHA-256 verification, returns mismatch, and its .finally runs.
+    // Without the identity guard, .finally deletes gen2's inflight entry.
+    gen1Gate.resolve();
+    // Yield so all nested microtasks (including .finally) are drained.
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    // Restore real crypto for gen2.
+    vi.stubGlobal("crypto", original);
+
+    // Gen 3 starts while gen2 is still pending on gen2Gate.
+    // With the identity guard: gen2's inflight entry survived gen1's
+    // .finally, so gen3 deduplicates onto gen2.
+    // Without the guard: gen1's .finally deleted gen2's entry, forcing
+    // gen3 to create a redundant third fetch.
+    const gen3 = loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+
+    gen2Gate.resolve();
+    const [r2, r3] = await Promise.all([gen2, gen3]);
+    expectRawOk(r2, javaSource, rawKey);
+    expectRawOk(r3, javaSource, rawKey);
+    expect(calls).toHaveLength(2);
+
+    // Cache populated: a fourth caller hits the cache.
+    const gen4 = await loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    expectRawOk(gen4, javaSource, rawKey);
+    expect(calls).toHaveLength(2);
+  });
 });
 
 describe("lazy review loader", () => {
