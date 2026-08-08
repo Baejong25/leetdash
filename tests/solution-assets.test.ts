@@ -423,6 +423,78 @@ describe("lazy raw source loader", () => {
     }
     expect(calls).toHaveLength(1);
   });
+
+  it("returns network-error when response body stream rejects mid-read and never caches it", async () => {
+    const calls = mockFetch(() =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("partial"));
+            controller.error(new TypeError("network reset"));
+          },
+        }),
+        { status: 200, headers: { "content-type": "text/plain" } },
+      ),
+    );
+
+    const result = await loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    expect(result).toEqual({ status: "network-error" });
+
+    // Failure must not be cached; retry triggers a fresh request.
+    const retry = await loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    expect(retry).toEqual({ status: "network-error" });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("returns network-error when crypto.subtle.digest rejects and retry succeeds after restore", async () => {
+    const calls = mockFetch(() => textResponse(javaSource));
+    const original = globalThis.crypto;
+    const mockDigest = vi.fn().mockRejectedValue(new DOMException("OperationError"));
+
+    vi.stubGlobal("crypto", {
+      subtle: { digest: mockDigest },
+      getRandomValues: original.getRandomValues.bind(original),
+    });
+
+    const result = await loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    expect(result).toEqual({ status: "network-error" });
+    expect(calls).toHaveLength(1);
+
+    // Restore real crypto; retry must produce a fresh network call and succeed.
+    vi.stubGlobal("crypto", original);
+    const retry = await loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    expectRawOk(retry, javaSource, rawKey);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("settles all concurrent callers when the shared fetch rejects internally", async () => {
+    const gate = deferred<void>();
+    const calls = mockFetch(() =>
+      gate.promise.then(
+        () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new TextEncoder().encode("half"));
+                controller.error(new TypeError("reset"));
+              },
+            }),
+            { status: 200, headers: { "content-type": "text/plain" } },
+          ),
+      ),
+    );
+
+    const first = loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    const second = loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    const third = loadRawSource({ url: rawUrl, expectedContentKey: rawKey });
+    gate.resolve();
+
+    const results = await Promise.all([first, second, third]);
+    for (const result of results) {
+      expect(result).toEqual({ status: "network-error" });
+    }
+    expect(calls).toHaveLength(1);
+  });
 });
 
 describe("lazy review loader", () => {

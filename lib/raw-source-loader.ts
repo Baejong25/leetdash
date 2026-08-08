@@ -113,48 +113,52 @@ async function fetchAndVerify(request: RawSourceRequest, controller: AbortContro
     return { status: "network-error" } as const;
   }
 
-  if (response.status === 404) {
-    return { status: "not-found" } as const;
-  }
-  if (!response.ok) {
+  try {
+    if (response.status === 404) {
+      return { status: "not-found" } as const;
+    }
+    if (!response.ok) {
+      return { status: "network-error" } as const;
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!textPlainPattern.test(contentType.trim())) {
+      return { status: "unsupported-type" } as const;
+    }
+
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_SOURCE_BYTES) {
+      return { status: "oversize" } as const;
+    }
+
+    const read = await readBodyBounded(response, MAX_SOURCE_BYTES);
+    if ("oversize" in read) {
+      return { status: "oversize" } as const;
+    }
+
+    const expected = assertHex64(request.expectedContentKey, "expectedContentKey");
+    const matches = await verifySha256(read.bytes, expected);
+    if (!matches) {
+      return { status: "mismatch" } as const;
+    }
+
+    let text: string;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes);
+    } catch {
+      return { status: "invalid-utf8" } as const;
+    }
+
+    sourceCache.set(key, { text, contentKey: expected });
+    if (sourceCache.size > SOURCE_CACHE_LIMIT) {
+      const oldest = sourceCache.keys().next().value;
+      if (oldest !== undefined) {
+        sourceCache.delete(oldest);
+      }
+    }
+    return { status: "ok", text, contentKey: expected } as const;
+  } catch {
     return { status: "network-error" } as const;
   }
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!textPlainPattern.test(contentType.trim())) {
-    return { status: "unsupported-type" } as const;
-  }
-
-  const declaredLength = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_SOURCE_BYTES) {
-    return { status: "oversize" } as const;
-  }
-
-  const read = await readBodyBounded(response, MAX_SOURCE_BYTES);
-  if ("oversize" in read) {
-    return { status: "oversize" } as const;
-  }
-
-  const expected = assertHex64(request.expectedContentKey, "expectedContentKey");
-  const matches = await verifySha256(read.bytes, expected);
-  if (!matches) {
-    return { status: "mismatch" } as const;
-  }
-
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes);
-  } catch {
-    return { status: "invalid-utf8" } as const;
-  }
-
-  sourceCache.set(key, { text, contentKey: expected });
-  if (sourceCache.size > SOURCE_CACHE_LIMIT) {
-    const oldest = sourceCache.keys().next().value;
-    if (oldest !== undefined) {
-      sourceCache.delete(oldest);
-    }
-  }
-  return { status: "ok", text, contentKey: expected } as const;
 }
 
 function attachCaller(key: string, entry: InflightSource, signal?: AbortSignal) {
@@ -221,9 +225,8 @@ export async function loadRawSource(request: RawSourceRequest): Promise<RawLoadR
 
   const controller = new AbortController();
   const entry: InflightSource = {
-    promise: fetchAndVerify(request, controller, key).then((result) => {
+    promise: fetchAndVerify(request, controller, key).finally(() => {
       inflightSources.delete(key);
-      return result;
     }),
     callers: new Set<AbortSignal>(),
     controller,
