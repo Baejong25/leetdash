@@ -1,33 +1,59 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildMascotUrl,
+  buildSourcePermalink,
+  injectLinePermalinks,
+  renderReviewFileComment,
   reviewContentKey,
-  reviewContentMarker,
   reviewFileKey,
-  reviewFileMarker,
   reviewSummaryMarker,
+  sanitizeReviewMarkdown,
 } from "../scripts/opencode-review-core.mjs";
 import {
   parseReviewArtifact,
   parseReviewArtifacts,
 } from "../scripts/review-artifacts-core.mjs";
 
-// Redacted fixture modeled on PR #126 comment shape
-// (https://github.com/whoisyourbias/leetdash/pull/126#issuecomment-5213445035):
-// file/content markers, mascot image header, branded heading, file/commit/workflow
-// metadata, then the review prose written by the model.
+// Fixtures model the REAL producer pipeline (scripts/opencode-review.mjs:258,389-393):
+// model text is sanitized first (entities escaped, markdown links broken, URL
+// schemes neutralized), then commit-pinned line permalinks are injected
+// (`L15` -> `https://github.com/<owner>/<repo>/blob/<sha>/<path>#L15`), then the
+// comment is rendered via renderReviewFileComment and posted by the bot.
 const path = "submissions/whoisyourbias/programmers/12906/solution.java";
 const source = Array.from({ length: 42 }, (_value, index) => `int value${index} = ${index};`).join("\n");
 const pathKey = reviewFileKey(path);
 const contentKey = reviewContentKey(source);
+const headSha = "0a134a1";
+const serverUrl = "https://github.com";
+const repository = "whoisyourbias/leetdash";
+const runUrl = "https://github.com/whoisyourbias/leetdash/actions/runs/1234";
+const sourceUrl = buildSourcePermalink({ serverUrl, repository, headSha, path });
+const mascotUrl = buildMascotUrl({ serverUrl, repository, baseSha: headSha });
 const commentUrl = "https://github.com/whoisyourbias/leetdash/pull/126#issuecomment-5213445035";
-const mascotLine = '<img src="https://github.com/whoisyourbias/leetdash/raw/abc1234/public/chalsakbot.png" width="72" alt="찰싹봇 캐릭터" align="left">';
 
 const pr126Prose = [
   "L15 `if (arr[i] === target) {` [분류: 정확성] `target`이 배열에 두 번 이상 등장하면 첫 번째 인덱스만 반환합니다. 찾은 뒤 바로 `return` 하도록 명시해주세요.",
   "",
   "L19 `return -1;` [분류: 스타일] 매직 넘버 `-1` 대신 `NOT_FOUND` 상수를 사용하면 의도가 명확해집니다.",
 ].join("\n");
+
+// Build the exact body the producer posts: sanitize -> inject permalinks -> render.
+function producerBody(prose, content = contentKey) {
+  const markdown = injectLinePermalinks(sanitizeReviewMarkdown(prose), sourceUrl);
+  return renderReviewFileComment({
+    path,
+    sourceUrl,
+    contentKey: content,
+    headSha,
+    runUrl,
+    mascotUrl,
+    markdown,
+    lineCount: 42,
+  });
+}
 
 function managedComment({
   id,
@@ -38,19 +64,13 @@ function managedComment({
   htmlUrl = commentUrl,
   body,
 }) {
-  const text = body ?? [
-    reviewFileMarker(path),
-    reviewContentMarker(content),
-    mascotLine,
-    "## 찰싹봇의 코드 리뷰",
-    "",
-    `파일: [${path}](https://github.com/whoisyourbias/leetdash/blob/abc1234/${path}#L1-L42)`,
-    "커밋: abc1234",
-    "워크플로: https://github.com/whoisyourbias/leetdash/actions/runs/999",
-    "",
-    prose,
-  ].join("\n");
-  return { id, user: { login }, html_url: htmlUrl, updated_at: updatedAt, body: text };
+  return {
+    id,
+    user: { login },
+    html_url: htmlUrl,
+    updated_at: updatedAt,
+    body: body ?? producerBody(prose, content),
+  };
 }
 
 const current = { pathKey, contentKey };
@@ -78,25 +98,37 @@ describe("parseReviewArtifact: managed bot comment gate", () => {
   it("requires managed file markers (rejects summary, malformed, partial, and reversed markers)", () => {
     const summaryBody = [
       reviewSummaryMarker,
-      mascotLine,
+      `<img src="${mascotUrl}" width="72" alt="찰싹봇 캐릭터" align="left">`,
       "## 찰싹봇 리뷰 경고",
-      "커밋: abc1234",
+      `커밋: ${headSha}`,
       "단계: model-response",
       "사유: MODEL_RESPONSE_INVALID",
       "상세: OpenCode response is missing review Markdown.",
       "재시도 가능: 아니요",
-      "워크플로: https://github.com/whoisyourbias/leetdash/actions/runs/999",
+      `워크플로: ${runUrl}`,
     ].join("\n");
     expect(parseReviewArtifact(managedComment({ id: 10, updatedAt: "2026-08-08T09:00:00Z", body: summaryBody }))).toBeNull();
 
     expect(parseReviewArtifact(managedComment({ id: 11, updatedAt: "2026-08-08T09:00:00Z", body: "not a managed comment" }))).toBeNull();
-    expect(parseReviewArtifact(managedComment({ id: 12, updatedAt: "2026-08-08T09:00:00Z", body: `<!-- leetdash-opencode-review-file:nothex -->\nprose` }))).toBeNull();
-    expect(parseReviewArtifact(managedComment({ id: 13, updatedAt: "2026-08-08T09:00:00Z", body: reviewFileMarker(path) }))).toBeNull();
-    expect(parseReviewArtifact(managedComment({ id: 14, updatedAt: "2026-08-08T09:00:00Z", body: reviewContentMarker(contentKey) }))).toBeNull();
+    expect(parseReviewArtifact(managedComment({ id: 12, updatedAt: "2026-08-08T09:00:00Z", body: "<!-- leetdash-opencode-review-file:nothex -->\nprose" }))).toBeNull();
+    expect(parseReviewArtifact(managedComment({
+      id: 13,
+      updatedAt: "2026-08-08T09:00:00Z",
+      body: "<!-- leetdash-opencode-review-file:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -->",
+    }))).toBeNull();
+    expect(parseReviewArtifact(managedComment({
+      id: 14,
+      updatedAt: "2026-08-08T09:00:00Z",
+      body: "<!-- leetdash-opencode-review-content:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef -->\nprose",
+    }))).toBeNull();
     expect(parseReviewArtifact(managedComment({
       id: 15,
       updatedAt: "2026-08-08T09:00:00Z",
-      body: `${reviewContentMarker(contentKey)}\n${reviewFileMarker(path)}\nprose`,
+      body: [
+        `<!-- leetdash-opencode-review-content:${contentKey} -->`,
+        `<!-- leetdash-opencode-review-file:${pathKey} -->`,
+        "prose",
+      ].join("\n"),
     }))).toBeNull();
   });
 
@@ -119,8 +151,17 @@ describe("parseReviewArtifact: managed bot comment gate", () => {
   });
 
   it("rejects a managed file comment with no review prose", () => {
-    expect(parseReviewArtifact(managedComment({ id: 22, updatedAt: "2026-08-08T09:00:00Z", prose: "" }))).toBeNull();
-    expect(parseReviewArtifact(managedComment({ id: 23, updatedAt: "2026-08-08T09:00:00Z", prose: "   \n  " }))).toBeNull();
+    const headerOnlyBody = renderReviewFileComment({
+      path,
+      sourceUrl,
+      contentKey,
+      headSha,
+      runUrl,
+      mascotUrl,
+      markdown: "",
+      lineCount: 42,
+    });
+    expect(parseReviewArtifact(managedComment({ id: 22, updatedAt: "2026-08-08T09:00:00Z", body: headerOnlyBody }))).toBeNull();
   });
 });
 
@@ -146,6 +187,9 @@ describe("parseReviewArtifact: safe artifact shape", () => {
     expect(artifact.text).not.toContain("파일:");
     expect(artifact.text).not.toContain("찰싹봇의 코드 리뷰");
     expect(artifact.text).not.toContain("<img");
+    expect(artifact.text).not.toContain("https://");
+    expect(artifact.text).not.toContain("github.com");
+    expect(artifact.text).not.toContain(headSha);
   });
 
   it("handles the explicit no-comment representation", () => {
@@ -178,6 +222,7 @@ describe("parseReviewArtifact: safe artifact shape", () => {
       { start: 15, end: 15 },
       { start: 17, end: 19 },
     ]);
+    expect(artifact?.text).toContain("i < n");
   });
 
   it("drops invalid line anchors (line zero, reversed ranges, oversized numbers)", () => {
@@ -186,28 +231,69 @@ describe("parseReviewArtifact: safe artifact shape", () => {
     expect(artifact?.lineReferences).toEqual([{ start: 15, end: 15 }]);
   });
 
-  it("neutralizes hostile markdown and HTML without emitting markup", () => {
+  it("decodes exactly one layer of producer entities so text is readable", () => {
     const prose = [
-      "L5 `code` [분류: 정확성] <script>alert(\"xss\")</script> <img src=x onerror=alert(1)>",
-      "[click me](https://evil.example/payload) and https://evil.example/raw and www.evil.example",
-      "<!-- sneaky --> and <style>.x{}</style>",
+      "L15 `if (i < n && arr[i] >= 0) {` [분류: 정확성] @see java.util.List 참고",
+      "`&lt;`와 `&#64;`는 모델이 쓴 리터럴 엔티티",
+    ].join("\n");
+    const artifact = parseReviewArtifact(managedComment({ id: 42, updatedAt: "2026-08-08T09:00:00Z", prose }));
+
+    expect(artifact?.text).toContain("i < n && arr[i] >= 0");
+    expect(artifact?.text).toContain("@see java.util.List");
+    expect(artifact?.text).not.toContain("&amp;");
+    expect(artifact?.text).not.toContain("&#64;see");
+    // Literal entity text the model wrote survives exactly one decode layer.
+    expect(artifact?.text).toContain("`&lt;`와 `&#64;`는");
+    expect(artifact?.lineReferences).toEqual([{ start: 15, end: 15 }]);
+  });
+
+  it("restores injected blob permalinks to bare labels and strips remote URLs", () => {
+    const prose = [
+      "L15 `if (x) return;` [분류: 정확성] 조기 반환 확인",
+      "L17-L19 ```java\nfor (int i = 0; i < n; i++) { sum += arr[i]; }\n``` [분류: 효율성] 범위 리뷰",
+      "모델이 인용한 https://evil.example/docs 참고와 www.example.com 링크는 제거된다",
+    ].join("\n");
+    const artifact = parseReviewArtifact(managedComment({ id: 43, updatedAt: "2026-08-08T09:00:00Z", prose }));
+
+    expect(artifact?.text).toContain("L15");
+    expect(artifact?.text).toContain("L17-L19");
+    expect(artifact?.text).toContain("조기 반환 확인");
+    expect(artifact?.text).toContain("링크는 제거된다");
+    for (const leaked of ["github.com", "blob/", headSha, path, "https://", "www.", "actions/runs", "&#58;", "&#46;"]) {
+      expect(artifact?.text).not.toContain(leaked);
+    }
+    expect(artifact?.lineReferences).toEqual([
+      { start: 15, end: 15 },
+      { start: 17, end: 19 },
+    ]);
+  });
+
+  it("renders hostile prose as inert React text nodes (no HTML or Markdown rendering)", () => {
+    const prose = [
+      "L5 `x` [분류: 정확성] <script>alert(\"xss\")</script> <img src=x onerror=alert(1)> a && b @user",
+      "[click](https://evil.example/payload) https://evil.example/raw www.evil.example <b>bold</b>",
     ].join("\n");
     const artifact = parseReviewArtifact(managedComment({ id: 50, updatedAt: "2026-08-08T09:00:00Z", prose }));
 
-    const serialized = JSON.stringify(artifact);
-    expect(serialized).not.toContain("<script");
-    expect(serialized).not.toContain("<img");
-    expect(serialized).not.toContain("<style");
-    expect(serialized).not.toContain("<!--");
-    expect(serialized).not.toContain("<html");
+    // Readable one-layer text: angle brackets, ampersands, and at signs survive
+    // as plain characters; React's text-node escaping is the only safety layer.
+    expect(artifact?.text).toContain('<script>alert("xss")</script>');
+    expect(artifact?.text).toContain("a && b");
+    expect(artifact?.text).toContain("@user");
+    expect(artifact?.text).toContain("[click]()");
+    for (const leaked of ["https://", "www.", "github.com", "&amp;", "&#58;", "&#46;", "&#64;"]) {
+      expect(artifact?.text).not.toContain(leaked);
+    }
 
-    expect(artifact?.text).not.toContain("https://");
-    expect(artifact?.text).not.toContain("www.");
+    const rendered = renderToStaticMarkup(createElement("div", null, artifact.text));
+    expect(rendered).toContain("&lt;script&gt;");
+    expect(rendered).toContain("&lt;img");
+    expect(rendered).toContain("&lt;b&gt;bold&lt;/b&gt;");
+    expect(rendered).not.toContain("<script");
+    expect(rendered).not.toContain("<img");
+    expect(rendered).not.toContain("<b>");
+    expect(rendered).not.toContain("href=");
 
-    expect(artifact?.text).toContain("&lt;script&gt;");
-    expect(artifact?.text).toContain("&lt;img");
-    expect(artifact?.text).toContain("https&#58;//evil");
-    expect(artifact?.text).toContain("www&#46;evil");
     expect(artifact?.lineReferences).toEqual([{ start: 5, end: 5 }]);
   });
 });
@@ -234,9 +320,8 @@ describe("parseReviewArtifacts: mapping against current solution metadata", () =
   it("yields no artifact for a stale path key", () => {
     const stalePathKey = reviewFileKey(`${path}/extra.java`);
     expect(stalePathKey).not.toBe(pathKey);
-    const comments = [managedComment({ id: 911, updatedAt: "2026-08-08T09:00:00Z", content: contentKey })];
-    const stale = parseReviewArtifacts(comments, { pathKey: stalePathKey, contentKey });
-    expect(stale).toEqual([]);
+    const comments = [managedComment({ id: 911, updatedAt: "2026-08-08T09:00:00Z" })];
+    expect(parseReviewArtifacts(comments, { pathKey: stalePathKey, contentKey })).toEqual([]);
   });
 
   it("selects the newest comment and breaks ties by highest id (latest wins)", () => {

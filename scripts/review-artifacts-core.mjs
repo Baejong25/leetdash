@@ -13,12 +13,17 @@
 //     kind=file marker pair (path + content SHA-256 markers) are accepted.
 //   - Artifacts are emitted ONLY with the six safe fields:
 //     { pathKey, contentKey, commentUrl, updatedAt, text, lineReferences }.
-//   - `text` is entity-escaped plain text safe for React text-node rendering.
+//   - `text` is the producer's display text with exactly one layer of the
+//     producer's known entity escaping decoded (so `<`, `>`, `&`, `@`, and URL
+//     punctuation are readable and no double entities remain), with trusted
+//     injected blob permalinks restored to bare `Lx`/`Lx-Ly` labels and any
+//     remaining remote URL stripped. It is safe ONLY as a React text node
+//     (React escapes angle brackets); never render it as HTML/Markdown.
 //     `text === null` is the explicit no-comment representation
 //     (`리뷰 코멘트 없음.`); `lineReferences` is then empty.
 //   - `lineReferences` are numeric GitHub source anchors extracted ONLY from
-//     the model's prose (`L<num>` / `L<start>-L<end>`); markdown/HTML links in
-//     the body are never emitted as anchors or links.
+//     the restored line labels (`L<num>` / `L<start>-L<end>`); markdown/HTML
+//     links in the body are never emitted as anchors or links.
 //   - `parseReviewArtifacts` maps comments against current solution metadata
 //     and selects the newest comment by `updated_at`, then the highest safe
 //     numeric comment id for deterministic ties.
@@ -36,19 +41,55 @@ const lineAnchorPattern = /L(\d{1,6})-L(\d{1,6})|L(\d{1,6})\b/g;
 const maxLineReferences = 100;
 const noCommentText = "리뷰 코멘트 없음.";
 
-function toPlainText(value) {
+// The producer (scripts/opencode-review.mjs) injects commit-pinned line
+// permalinks AFTER sanitization, so the comment body contains raw
+// `https://github.com/<owner>/<repo>/blob/<sha>/<path>#L<num>` URLs.
+// Restoring them to the original bare labels keeps prose readable and keeps
+// SHA/repo/path out of artifact text.
+const injectedPermalinkPattern = /\bhttps:\/\/github\.com\/[^\s#)]*\/blob\/[^\s#)]*#L(\d+)(?:-L(\d+))?/g;
+
+// Model-authored URLs were neutralized by the producer (`https:` ->
+// `https&#58;`, `www.` -> `www&#46;`) and become raw URL strings again after
+// decoding; remove them so no remote URL survives in artifact text. Trailing
+// sentence punctuation is preserved.
+const remoteUrlPattern = /\b(?:https?|ftp):\/\/[^\s<>"']+|\bmailto:[^\s<>"']+|\bwww\.[^\s<>"']+/gi;
+
+// Display pipeline order matters:
+//   1. restore trusted injected blob permalinks to bare `Lx`/`Lx-Ly` labels
+//      (raw `https://github.com/...` URLs the producer injected after
+//      sanitization);
+//   2. decode exactly one layer of the producer's known escaping in
+//      reverse-safe order — atomic entities first, `&amp;` LAST — so a
+//      literal entity the model wrote (`&lt;` -> producer `&amp;lt;`) stays
+//      literal while real escapes (`<` -> producer `&lt;`) become readable
+//      angle brackets; the producer's markdown-link breaks (`](` -> `\](`,
+//      `][` -> `\][`) are undone too, but the text is never rendered as
+//      Markdown, so no link can be reconstructed;
+//   3. remove any remaining remote URL (model-authored URLs were neutralized
+//      by the producer and become raw strings again after decoding), keeping
+//      trailing sentence punctuation.
+function toDisplayText(value) {
   return String(value ?? "")
     .replace(/^\uFEFF/, "")
     .trim()
     .replace(/\r\n?/g, "\n")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/g, " ")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\]\s*\(/g, "\\](")
-    .replace(/\]\s*\[/g, "\\][")
-    .replace(/\b(https?|mailto):/gi, "$1&#58;")
-    .replace(/\bwww\./gi, "www&#46;");
+    .replace(injectedPermalinkPattern, (_match, start, end) => (
+      end === undefined ? `L${start}` : `L${start}-L${end}`
+    ))
+    .replace(/&#58;/g, ":")
+    .replace(/&#46;/g, ".")
+    .replace(/&#64;/g, "@")
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/\\]\s*\[/g, "][")
+    .replace(/\\]\(/g, "](")
+    .replace(/&amp;/g, "&")
+    .replace(remoteUrlPattern, (match) => {
+      const trailing = /[.,;:!?)\]}"']+$/.exec(match);
+      return trailing ? trailing[0] : "";
+    })
+    .trim();
 }
 
 function stripManagedPrefix(body) {
@@ -119,7 +160,7 @@ export function parseReviewArtifact(comment) {
   const updatedAt = comment.updated_at;
   if (typeof updatedAt !== "string" || !Number.isFinite(Date.parse(updatedAt))) return null;
 
-  const text = toPlainText(stripManagedPrefix(comment.body));
+  const text = toDisplayText(stripManagedPrefix(comment.body));
   if (text === noCommentText) {
     return {
       pathKey: marker.key,
