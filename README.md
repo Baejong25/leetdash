@@ -240,7 +240,7 @@ gh run list --workflow sweep-submission-prs.yml --repo whoisyourbias/leetdash --
 
 ### 지연 로딩과 메타데이터 전용 규칙
 
-빌드 산출물(HTML, JS, `data/progress.json`, 리뷰 JSON)에는 풀이 소스 본문이나 리뷰 본문이 들어가지 않습니다. 제출 레코드는 중앙 저장소, 커밋, 원시 URL, permalink, 경로 해시, 내용 해시만 담는 메타데이터입니다.
+빌드 산출물에는 풀이 소스 본문이 들어가지 않습니다. 초기 라우트 HTML/JS, `data/progress.json`, 리뷰 JSON 어디에도 소스 코드 본문은 포함되지 않으며, 제출 레코드는 중앙 저장소, 커밋, 원시 URL, permalink, 경로 해시, 내용 해시만 담는 메타데이터입니다. 리뷰 본문도 초기 라우트 HTML/JS에는 포함되지 않고, 풀이자를 선택한 뒤 분할 리뷰 JSON을 지연 로딩합니다.
 
 브라우저는 GitHub 토큰을 받지 않습니다. 풀이자를 선택한 뒤에야 `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`에서 소스 파일을 지연 로딩합니다. 소스는 256 KiB 제한과 SHA-256 내용 검증을 거치며, 검증된 내용만 20개짜리 FIFO 메모리 캐시에 보관합니다. 검증 실패, 크기 초과, 404 같은 실패는 캐시하지 않고 오류 상태를 표시하며 커밋 고정 permalink를 대안으로 제공합니다.
 
@@ -248,7 +248,7 @@ gh run list --workflow sweep-submission-prs.yml --repo whoisyourbias/leetdash --
 
 ### 리뷰 생애주기
 
-리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
+리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 분할 리뷰 JSON에는 살균된 일반 텍스트 리뷰(`text`)와 줄 참조(`lineReferences`)가 들어 있습니다. `text`는 HTML이나 Markdown이 아니라 React 텍스트 노드로만 렌더링됩니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
 
 `index.json`의 상태:
 
