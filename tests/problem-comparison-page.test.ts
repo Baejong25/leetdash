@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { catalog, type CatalogProblem, type ProblemCatalog } from "@/lib/catalog";
 import {
   getProblemSolutionDetail,
@@ -212,11 +214,35 @@ describe("problem comparison detail contract", () => {
 
   it("is non-null for every comparable param", () => {
     const params = listComparableProblemParams();
-
     for (const param of params) {
       const detail = getProblemSolutionDetail(param.provider, param.problemId);
       expect(detail).not.toBeNull();
       expect(detail?.problem.problemKey).toBe(`${param.provider}:${param.problemId}`);
     }
+  });
+
+  it("page.tsx is under 250 pure LOC", () => {
+    const path = join(import.meta.dirname ?? __dirname, "../app/problems/[provider]/[problemId]/page.tsx");
+    const source = readFileSync(path, "utf-8");
+    const lines = source.split("\n").filter(
+      (line) => line.trim() !== "" && !line.trim().startsWith("//"),
+    );
+    expect(lines.length).toBeLessThan(250);
+  });
+
+  it("page.tsx does not duplicate solver table or explorer DOM in a fallback", () => {
+    const path = join(import.meta.dirname ?? __dirname, "../app/problems/[provider]/[problemId]/page.tsx");
+    const source = readFileSync(path, "utf-8");
+    expect(source).not.toMatch(/GeometryStableFallback/);
+    expect(source).not.toMatch(/StaticSolverTable/);
+    expect(source).not.toContain("data-testid=\"solver-row\"");
+    expect(source).not.toContain("data-testid=\"unsolved-user-row\"");
+  });
+
+  it("uses chalsakbot.png as favicon, not transparent favicon.ico", () => {
+    const layoutPath = join(import.meta.dirname ?? __dirname, "../app/layout.tsx");
+    const layoutSource = readFileSync(layoutPath, "utf-8");
+    expect(layoutSource).toContain("chalsakbot.png");
+    expect(layoutSource).not.toContain("favicon.ico");
   });
 });

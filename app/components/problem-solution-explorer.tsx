@@ -150,7 +150,11 @@ export function ProblemSolutionExplorer({
   return (
     <div className={styles.explorerRoot}>
       <div className={styles.detailSection}>
-        {/* ── Unknown user error ── */}
+        {outcome.kind === "no-query" && (
+          <section className="panel" aria-label="풀이 선택 안내">
+            <div className="empty">아래 목록에서 풀이를 선택해 주세요.</div>
+          </section>
+        )}
         {outcome.kind === "unknown-user" && (
           <section className="panel" aria-label="알 수 없는 사용자">
             <div className="panel-header">

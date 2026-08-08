@@ -34,9 +34,6 @@ export function resolveSelection(
   detail: ProblemSolutionDetail,
 ): SelectionOutcome {
   if (query === null) {
-    if (detail.solvers.length > 0) {
-      return { kind: "selected-solver", solver: detail.solvers[0] };
-    }
     return { kind: "no-query" };
   }
 

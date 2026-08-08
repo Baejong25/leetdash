@@ -114,20 +114,17 @@ afterEach(() => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("resolveSelection", () => {
-  it("returns selected-solver for null query (absent param, default to first solver)", () => {
+  it("returns no-query for null query (absent param, no auto-selection)", () => {
     const detail = fixtureDetail({
       solvers: [
         fixtureSolver({ user: fixtureUser({ id: "alice", displayName: "Alice" }) }),
       ],
     });
     const outcome = resolveSelection(null, detail);
-    expect(outcome.kind).toBe("selected-solver");
-    if (outcome.kind === "selected-solver") {
-      expect(outcome.solver.user.id).toBe("alice");
-    }
+    expect(outcome.kind).toBe("no-query");
   });
 
-  it("defaults to detail.solvers[0] when absent query, not a hard-coded ID", () => {
+  it("does not auto-select a solver when query is absent", () => {
     const firstSolver = fixtureSolver({
       user: fixtureUser({ id: "charlie", displayName: "Charlie" }),
     });
@@ -142,10 +139,7 @@ describe("resolveSelection", () => {
       ],
     });
     const outcome = resolveSelection(null, detail);
-    expect(outcome.kind).toBe("selected-solver");
-    if (outcome.kind === "selected-solver") {
-      expect(outcome.solver.user.id).toBe("charlie");
-    }
+    expect(outcome.kind).toBe("no-query");
   });
 
   it("returns no-query for null query when no solvers exist (theoretical guard)", () => {
@@ -257,7 +251,7 @@ describe("resolveSelection", () => {
       ],
       solvers: [fixtureSolver()],
     });
-    expect(exhaustive(resolveSelection(null, detail))).toBe("solver:alice");
+    expect(exhaustive(resolveSelection(null, detail))).toBe("no-query");
     expect(exhaustive(resolveSelection("", detail))).toBe("unknown:");
     expect(exhaustive(resolveSelection("alice", detail))).toBe("solver:alice");
     expect(exhaustive(resolveSelection("bob", detail))).toBe("unsolved:bob");
