@@ -1,6 +1,7 @@
 import catalogData from "@/data/problem-catalog.json";
 import progressData from "@/data/progress.json";
 import { type CatalogProblem, type ProblemCatalog } from "@/lib/catalog";
+import { getSelectedSubmission } from "@/lib/submission-selection";
 import { type ProgressData, type Submission, type User } from "@/lib/types";
 
 export type ComparableProblemParam = {
@@ -35,12 +36,6 @@ export type ProblemSolutionDetail = {
 
 type ProgressUser = ProgressData["users"][number];
 
-const SUBMISSION_RANK: Record<Submission["status"], number> = {
-  SOLVED: 3,
-  REVIEWING: 2,
-  SKIPPED: 1,
-};
-
 function pickUserIdentity(user: ProgressUser): ProblemDetailUser {
   return {
     id: user.id,
@@ -48,22 +43,6 @@ function pickUserIdentity(user: ProgressUser): ProblemDetailUser {
     githubUsername: user.githubUsername,
     active: user.active,
   };
-}
-
-// Mirrors scripts/build-progress.mjs selection: highest status rank wins, first occurrence on ties.
-function getSelectedSubmission(user: ProgressUser, problemKey: string): Submission | null {
-  let selected: Submission | null = null;
-
-  for (const submission of user.submissions) {
-    if (submission.problemKey !== problemKey) {
-      continue;
-    }
-    if (selected === null || SUBMISSION_RANK[submission.status] > SUBMISSION_RANK[selected.status]) {
-      selected = submission;
-    }
-  }
-
-  return selected;
 }
 
 function toSolverSubmission(submission: Submission): ProblemSolver["submission"] {
