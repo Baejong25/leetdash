@@ -2,7 +2,7 @@ import { type Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ProblemComparisonShell } from "@/app/components/problem-comparison-shell";
+import { ProblemSolutionExplorer } from "@/app/components/problem-solution-explorer";
 import { difficultyLabel } from "@/lib/format";
 import {
   getProblemSolutionDetail,
@@ -65,8 +65,6 @@ export default async function ProblemComparisonPage({
     notFound();
   }
 
-  const solverIds = new Set(detail.solvers.map((solver) => solver.user.id));
-
   return (
     <div className="page">
       <div className="page-header">
@@ -105,7 +103,7 @@ export default async function ProblemComparisonPage({
           </div>
         }
       >
-        <ProblemComparisonShell detail={detail} solverIds={solverIds} />
+        <ProblemSolutionExplorer detail={detail} />
       </Suspense>
     </div>
   );

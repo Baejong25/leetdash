@@ -42,7 +42,7 @@ export type SolutionReviewPanelProps = {
   pathKey: string | null;
   contentKey: string | null;
   basePath?: string;
-  onFocusLine: (line: number) => void;
+  onFocusLine: (ref: LineReference) => void;
 };
 
 export function SolutionReviewPanel({
@@ -100,8 +100,8 @@ export function SolutionReviewPanel({
   }, []);
 
   const handleFocusLine = useCallback(
-    (line: number) => {
-      onFocusLine(line);
+    (ref: LineReference) => {
+      onFocusLine(ref);
     },
     [onFocusLine],
   );
@@ -129,7 +129,7 @@ function ReviewContentView({
   onFocusLine,
 }: {
   view: ReviewPanelView;
-  onFocusLine: (line: number) => void;
+  onFocusLine: (ref: LineReference) => void;
 }) {
   switch (view.kind) {
     case "loading":
@@ -160,7 +160,7 @@ function ReviewContentView({
                   className={`${styles.lineButton} button`}
                   type="button"
                   aria-label={lineLabel(ref)}
-                  onClick={() => onFocusLine(ref.start)}
+                  onClick={() => onFocusLine(ref)}
                 >
                   {ref.start === ref.end ? `L${ref.start}` : `L${ref.start}–L${ref.end}`}
                 </button>
