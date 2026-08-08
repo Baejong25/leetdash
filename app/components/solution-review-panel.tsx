@@ -51,7 +51,9 @@ export function SolutionReviewPanel({
   basePath,
   onFocusLine,
 }: SolutionReviewPanelProps) {
-  const [view, setView] = useState<ReviewPanelView>({ kind: "idle" });
+  const [view, setView] = useState<ReviewPanelView>(
+    pathKey !== null && contentKey !== null ? { kind: "loading" } : { kind: "idle" },
+  );
   const fetchIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 

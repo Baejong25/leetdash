@@ -6,6 +6,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LeetCode 진행 레이더",
   description: "GitHub 저장소 기반 LeetCode 스터디 진행 현황 대시보드",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
