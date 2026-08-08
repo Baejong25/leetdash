@@ -13,6 +13,7 @@ function uniqueTokens(css: string): string[] {
 
 const APPROVED_TOKENS = new Set([
   "--bg", "--surface", "--surface-muted", "--text", "--muted",
+  "--muted-strong",
   "--border", "--strong-border", "--accent", "--accent-strong",
   "--accent-soft", "--warn", "--warn-soft", "--danger",
   "--danger-soft", "--ok", "--ok-soft", "--shadow",
@@ -191,5 +192,38 @@ describe("link-button reset contract", () => {
     expect(block).toContain("cursor: pointer");
     expect(block).toContain("font: inherit");
     expect(block).toContain("padding: 0");
+  });
+});
+
+describe("Regressions: batch 2", () => {
+  it("defines --muted-strong in :root for badge neutral contrast WCAG AA compliance", () => {
+    const css = readCss("app/globals.css");
+    const rootBlock = css.split(":root")[1]?.split("}")[0] ?? "";
+    expect(rootBlock).toContain("--muted-strong: #586674");
+    expect(APPROVED_TOKENS.has("--muted-strong")).toBe(true);
+  });
+
+  it("badge.neutral uses var(--muted-strong) not raw hex", () => {
+    const css = readCss("app/globals.css");
+    const block = css.split(".badge.neutral")[1]?.split("}")[0] ?? "";
+    expect(block).toContain("var(--muted-strong)");
+    expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+  });
+
+  it("code-viewer surface has contain: layout paint for CLS isolation", () => {
+    const css = readCss("app/components/solution-code-viewer.module.css");
+    const block = css.split(".surface")[1]?.split("}")[0] ?? "";
+    expect(block).toContain("contain: layout paint");
+  });
+
+  it("review-panel body has min-height for loading CLS stability", () => {
+    const css = readCss("app/components/solution-review-panel.module.css");
+    const block = css.split(".body")[1]?.split("}")[0] ?? "";
+    expect(block).toContain("min-height: 80px");
+  });
+
+  it("Copy button aria-label includes visible text for label-content match", () => {
+    const tsx = readCss("app/components/solution-code-viewer.tsx");
+    expect(tsx).toContain('aria-label="Copy 소스 코드 복사"');
   });
 });
