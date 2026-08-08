@@ -255,7 +255,7 @@ These components will be built in later tasks. Define their token contract here;
 
 #### Code Surface
 - **Purpose:** Displays selected solution source code with line numbers.
-- **States:** loading (skeleton/fade), loaded (code visible), error (fetch failure message), empty (no solution selected), oversized (≥256 KiB — show first 256 KiB + truncation notice).
+- **States:** loading (skeleton/fade), loaded (code visible), error (fetch failure message), empty (no solution selected), oversized (≥256 KiB — reject source entirely; show error message with immutable GitHub permalink link; never render a truncated partial solution).
 - **Tokens:** Uses `--surface` background, `--border` dividers. Line numbers in `--muted` mono. Code text in `--text` mono. Selected/focused line highlight via `--accent-soft`.
 - **Scroll:** Horizontal scroll for long lines; container must not overflow the page. Vertical scroll with sticky header.
 - **Accessibility:** Semantic `<pre><code>`, ARIA live region for loading/error state changes.
@@ -268,8 +268,12 @@ These components will be built in later tasks. Define their token contract here;
 
 #### Review Item
 - **Purpose:** Displays matched review comment for the current code.
-- **States:** absent (no review exists), matched (review shown), stale (path/content hash mismatch — show "리뷰 동기화 불가"), sync-unavailable (deploy-time sync failed — show notice distinct from "no review").
-- **Tokens:** Uses `--surface-muted` background, `--border` separator. Reviewer attribution in `--muted` size. Review body in `--text`.
+- **States:**
+  - *absent*: no review exists on the source PR. Treated as neutral — show an empty informational placeholder.
+  - *matched*: path hash AND content hash match the current central-repository file. Display the review.
+  - *stale*: either hash mismatches — the review was written against different code. **Never** display stale review text. Render an error notice explaining the content has changed since the review was written, and display the immutable GitHub PR comment permalink for manual cross-reference. This is a `--danger`/error state, not informational.
+  - *sync-unavailable*: deploy-time review-sync step failed entirely (e.g., network outage, GitHub API rate limit). This is a `--warn`/warning state, semantically distinct from both absent and stale. Show a warning notice that reviews could not be loaded for this deploy; the page may be refreshed after the next successful deploy. Sync-unavailable must never block the Pages deploy.
+- **Tokens:** Uses `--surface-muted` background, `--border` separator. Reviewer attribution in `--muted` size. Review body in `--text`. Stale state: background switches to `--danger-soft`, text to `--danger`, border-color to `--danger`. Sync-unavailable: background switches to `--warn-soft`, text to `--warn`, border-color to `--warn`.
 - **Accessibility:** ARIA live region for state transitions.
 
 ## 6. Motion & Interaction
