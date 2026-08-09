@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildRecentSolvedSubmissions, getDashboardData, getUserDetail } from "@/lib/progress";
-import { SubmissionStatus, type Submission } from "@/lib/types";
+import { buildRecentSolvedSubmissions, getCommunitySolutionCounts, getDashboardData, getUserDetail } from "@/lib/progress";
+import { SubmissionStatus, type ProgressData, type ProgressUser, type Submission } from "@/lib/types";
 
 function submission(overrides: Partial<Submission>): Submission {
   return {
@@ -193,5 +193,222 @@ describe("dashboard progress helpers", () => {
       expect.objectContaining({ problemKey: "leetcode:35" }),
       expect.objectContaining({ problemKey: "leetcode:20" }),
     ]);
+  });
+});
+
+describe("community solution counts per canonical problemKey", () => {
+  function fixtureUser(overrides: Partial<ProgressUser>): ProgressUser {
+    return {
+      id: "user",
+      displayName: "user",
+      githubUsername: "user",
+      active: true,
+      submissionsPath: "submissions/user",
+      submissions: [],
+      activity: [],
+      ...overrides,
+    };
+  }
+
+  function fixtureSubmission(overrides: Partial<Submission>): Submission {
+    return {
+      id: `s:${overrides.problemKey}`,
+      userId: "user",
+      problemKey: "leetcode:1",
+      sourceKey: "top-interview-easy",
+      submissionKey: "1",
+      status: SubmissionStatus.SOLVED,
+      solutionPath: `submissions/user/top-interview-easy/1/Solution.java`,
+      source: "solution-file",
+      generatedAt: "2024-01-01T00:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  function fixtureData(users: ProgressUser[]): ProgressData {
+    return { generatedAt: "2024-01-01T00:00:00.000Z", users };
+  }
+
+  it("counts one solver for a problem with a current solution", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        submissions: [
+          fixtureSubmission({ id: "ada:1", userId: "ada", problemKey: "leetcode:1" }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    expect(counts.get("leetcode:1")).toBe(1);
+    expect(counts.get("leetcode:unknown")).toBeUndefined();
+  });
+
+  it("returns zero for a problem with no solution path", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        submissions: [
+          fixtureSubmission({
+            id: "ada:1",
+            userId: "ada",
+            problemKey: "leetcode:1",
+            status: SubmissionStatus.SKIPPED,
+            solutionPath: undefined,
+          }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    expect(counts.get("leetcode:1")).toBeUndefined();
+  });
+
+  it("collapses duplicate-list submissions to one solver per canonical problemKey", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        submissions: [
+          fixtureSubmission({
+            id: "ada:1:skipped",
+            userId: "ada",
+            problemKey: "leetcode:1",
+            sourceKey: "top-interview-easy",
+            submissionKey: "1",
+            status: SubmissionStatus.SKIPPED,
+            solutionPath: undefined,
+          }),
+          fixtureSubmission({
+            id: "ada:1:solved",
+            userId: "ada",
+            problemKey: "leetcode:1",
+            sourceKey: "top-interview-150",
+            submissionKey: "1",
+          }),
+        ],
+      }),
+      fixtureUser({
+        id: "bob",
+        submissions: [
+          fixtureSubmission({ id: "bob:1", userId: "bob", problemKey: "leetcode:1" }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    expect(counts.get("leetcode:1")).toBe(2);
+  });
+
+  it("includes inactive registered solvers when their current solution exists", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        active: false,
+        submissions: [
+          fixtureSubmission({ id: "ada:1", userId: "ada", problemKey: "leetcode:1" }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    expect(counts.get("leetcode:1")).toBe(1);
+  });
+
+  it("counts multiple solvers for the same problem independently per provider", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        submissions: [
+          fixtureSubmission({ id: "ada:lc1", userId: "ada", problemKey: "leetcode:1" }),
+          fixtureSubmission({ id: "ada:pg1", userId: "ada", problemKey: "programmers:1" }),
+        ],
+      }),
+      fixtureUser({
+        id: "bob",
+        submissions: [
+          fixtureSubmission({ id: "bob:lc1", userId: "bob", problemKey: "leetcode:1" }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    expect(counts.get("leetcode:1")).toBe(2);
+    expect(counts.get("programmers:1")).toBe(1);
+  });
+
+  it("only counts users whose selected submission has a solution path", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        submissions: [
+          fixtureSubmission({
+            id: "ada:1",
+            userId: "ada",
+            problemKey: "leetcode:1",
+            status: SubmissionStatus.REVIEWING,
+            solutionPath: undefined,
+          }),
+        ],
+      }),
+      fixtureUser({
+        id: "bob",
+        submissions: [
+          fixtureSubmission({ id: "bob:1", userId: "bob", problemKey: "leetcode:1" }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    // ada's REVIEWING submission has no solutionPath, so only bob counts
+    expect(counts.get("leetcode:1")).toBe(1);
+  });
+
+  it("picks the highest-status submission when duplicate keys exist in the same user", () => {
+    const data = fixtureData([
+      fixtureUser({
+        id: "ada",
+        submissions: [
+          fixtureSubmission({
+            id: "ada:1:skipped",
+            userId: "ada",
+            problemKey: "leetcode:1",
+            status: SubmissionStatus.SKIPPED,
+            solutionPath: undefined,
+          }),
+          fixtureSubmission({
+            id: "ada:1:solved",
+            userId: "ada",
+            problemKey: "leetcode:1",
+          }),
+        ],
+      }),
+    ]);
+
+    const counts = getCommunitySolutionCounts(data);
+
+    expect(counts.get("leetcode:1")).toBe(1);
+  });
+
+  it("exposes communitySolutionCount per item in user detail", async () => {
+    const detail = await getUserDetail("mygo");
+
+    expect(detail).not.toBeNull();
+    if (!detail) {
+      return;
+    }
+
+    for (const list of detail.lists) {
+      for (const item of list.items) {
+        expect(item).toHaveProperty("communitySolutionCount");
+        expect(typeof item.communitySolutionCount).toBe("number");
+        expect(item.communitySolutionCount).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });
