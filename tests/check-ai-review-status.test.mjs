@@ -361,6 +361,52 @@ describe("runStatusCheck", () => {
     }
   });
 
+  it("times out a stalled response body per attempt, retries once, and settles flash down with exactly two calls", async () => {
+    vi.useFakeTimers();
+    try {
+      let flashCalls = 0;
+      const fetchImpl = () => {
+        flashCalls += 1;
+        // HTTP 200 whose body parse never settles — the stalled json()
+        // must time out per attempt instead of hanging the probe.
+        return Promise.resolve({ status: 200, json: () => new Promise(() => {}) });
+      };
+
+      const pending = checkFlash({ fetchImpl, apiKey });
+
+      // First 300,000ms attempt: the stalled body times out (retryable),
+      // so the single retry is already in flight with its own timer.
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(flashCalls).toBe(2);
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Second 300,000ms attempt: the body stalls again; the probe settles
+      // down with every attempt timer cleared and no unhandled rejection.
+      await vi.advanceTimersByTimeAsync(300_000);
+      const result = await pending;
+      expect(result).toEqual({ message: "down", color: "red" });
+      expect(flashCalls).toBe(2);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("classifies a normal JSON parse rejection as final with exactly one attempt (no retry)", async () => {
+    let flashCalls = 0;
+    const fetchImpl = () => {
+      flashCalls += 1;
+      return Promise.resolve({
+        status: 200,
+        json: () => Promise.reject(new SyntaxError("Unexpected token")),
+      });
+    };
+
+    const result = await checkFlash({ fetchImpl, apiKey });
+    expect(result).toEqual({ message: "down", color: "red" });
+    expect(flashCalls).toBe(1);
+  });
+
   it("rejects without writing anything when OPENCODE_API_KEY is missing", async () => {
     await expect(runStatusCheck({
       fetchImpl: async () => jsonResponse({ data: [] }),

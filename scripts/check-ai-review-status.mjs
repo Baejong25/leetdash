@@ -78,26 +78,40 @@ async function checkGateway({ fetchImpl, apiKey }) {
  * assistant response, or { ok: false, retryable } where retryable is
  * true only for timeout/transport failures and the retryable HTTP
  * statuses (408/425/429/5xx). Invalid JSON and invalid assistant
- * responses are final. Each attempt owns its own AbortController timer.
+ * responses are final. Each attempt owns one AbortController and one
+ * timer that race both the fetch and the response body parse, so a
+ * stalled body times out exactly like a stalled fetch (mirrors
+ * scripts/opencode-review-clients.mjs). On timeout the controller is
+ * aborted and the timer is always cleared in the finally.
  */
 async function attemptFlash({ fetchImpl, apiKey }) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), openCodeRequestTimeoutMs);
+  const timedOut = Symbol("flash attempt timed out");
+  let timeout;
+  const timeoutFailure = new Promise((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(timedOut);
+      controller.abort();
+    }, openCodeRequestTimeoutMs);
+  });
   try {
     let response;
     try {
-      response = await fetchImpl(openCodeChatCompletionsUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: openCodeApiModel,
-          messages: [{ role: "user", content: FLASH_PROMPT }],
+      response = await Promise.race([
+        fetchImpl(openCodeChatCompletionsUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: openCodeApiModel,
+            messages: [{ role: "user", content: FLASH_PROMPT }],
+          }),
+          signal: controller.signal,
         }),
-        signal: controller.signal,
-      });
+        timeoutFailure,
+      ]);
     } catch {
       // Timeout or transport failure — retryable.
       return { ok: false, retryable: true };
@@ -107,10 +121,11 @@ async function attemptFlash({ fetchImpl, apiKey }) {
     }
     let body;
     try {
-      body = await response.json();
-    } catch {
-      // Invalid JSON — final.
-      return { ok: false, retryable: false };
+      body = await Promise.race([response.json(), timeoutFailure]);
+    } catch (error) {
+      // A stalled body parse that hit the timer is retryable; a normal
+      // JSON parse rejection before the timer is final.
+      return error === timedOut ? { ok: false, retryable: true } : { ok: false, retryable: false };
     }
     // Mirrors the review client response validation via the shared
     // contract: structural checks only — untrusted response content is
@@ -118,7 +133,7 @@ async function attemptFlash({ fetchImpl, apiKey }) {
     const parsed = parseAssistantResponse(body);
     return parsed.ok ? { ok: true } : { ok: false, retryable: false };
   } finally {
-    clearTimeout(timer);
+    clearTimeout(timeout);
   }
 }
 
