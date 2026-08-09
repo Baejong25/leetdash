@@ -1,5 +1,23 @@
 # LeetCode Progress Radar
 
+## 서드파티 서비스 상태
+
+![OpenCode Go Gateway](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fgateway-status.json)
+![DeepSeek V4 Flash (AI Review)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fdeepseek-flash-status.json)
+![GitHub Pages](https://img.shields.io/github/deployments/whoisyourbias/leetdash/github-pages)
+![GitHub Actions - Deploy](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/deploy-pages.yml?branch=master)
+![GitHub Actions - OpenCode Review](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/opencode-review.yml)
+![GitHub Actions - Sweep](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/sweep-submission-prs.yml)
+
+| 서비스 | 상태 배지 | 용도 |
+| --- | --- | --- |
+| AI 리뷰 API · OpenCode Go 게이트웨이 | ![OpenCode Go Gateway](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fgateway-status.json) | 코드 리뷰 요청이 거치는 게이트웨이 연결 상태 |
+| AI 리뷰 API · DeepSeek V4 Flash | ![DeepSeek V4 Flash (AI Review)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fdeepseek-flash-status.json) | 제출 PR의 solution.* 리뷰에 쓰는 모델 응답 상태 |
+| GitHub Pages | ![GitHub Pages](https://img.shields.io/github/deployments/whoisyourbias/leetdash/github-pages) | 대시보드 정적 배포 상태 |
+| GitHub Actions | ![GitHub Actions - Deploy](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/deploy-pages.yml?branch=master) ![GitHub Actions - OpenCode Review](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/opencode-review.yml) ![GitHub Actions - Sweep](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/sweep-submission-prs.yml) | 검증·리뷰·머지·배포 CI/CD 워크플로우 상태 |
+
+AI 리뷰 API는 `deepseek-v4-flash` 모델을 OpenCode Go 게이트웨이(`https://opencode.ai/zen/go/v1`)를 통해 사용하며, 저장소 secret `OPENCODE_API_KEY`로 인증합니다 (DeepSeek의 직접 API가 아닙니다). 첫 두 배지는 `deepseek-status-check.yml` 워크플로우가 매시간(hourly) 실행되어 `status-data` 브랜치에 상태를 기록하며, 이 배지가 이를 읽습니다. 배지가 오래된 것처럼 보이면 GitHub Actions 탭에서 해당 워크플로우를 수동 실행(`workflow_dispatch`)할 수 있습니다 — GitHub는 공개 저장소에서 60일 이상 기본 브랜치 커밋이 없으면 예약 워크플로우를 일시 중지하므로, 장기간 활동이 없으면 배지 갱신이 멈출 수 있습니다. GitHub Pages 배포 URL: `https://whoisyourbias.github.io/leetdash/`.
+
 ## 제출 규칙
 
 풀이 폴더는 반드시 아래 소스별 규칙을 따릅니다. `slug`나 LeetCode 내부 ID는 참가자 폴더명으로 쓰지 않습니다.
