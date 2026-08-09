@@ -1,9 +1,13 @@
+import {
+  isRetryableStatus,
+  openCodeApiModel,
+  openCodeChatCompletionsUrl,
+  openCodeRequestTimeoutMs,
+  parseAssistantResponse,
+} from "./opencode-api-contract.mjs";
 import { parseManagedReviewMarker, ReviewFailure } from "./opencode-review-core.mjs";
 
-const openCodeChatCompletionsUrl = "https://opencode.ai/zen/go/v1/chat/completions";
 const openCodeConfiguredModel = "opencode-go/deepseek-v4-flash";
-const openCodeApiModel = "deepseek-v4-flash";
-const openCodeRequestTimeoutMs = 300_000;
 
 function extractRequestId(response) {
   const headers = response?.headers;
@@ -13,10 +17,6 @@ function extractRequestId(response) {
     if (typeof value === "string" && value) return value;
   }
   return undefined;
-}
-
-function isRetryableStatus(status) {
-  return status === 408 || status === 425 || status === 429 || (Number.isInteger(status) && status >= 500 && status <= 599);
 }
 
 function toSafeHttpFailure({ stage, reason, response, detail = "External service request failed." }) {
@@ -144,17 +144,15 @@ class OpenCodeClient {
           detail: "OpenCode returned an invalid response.",
         });
       }
-      const choices = body?.choices;
-      const message = Array.isArray(choices) && choices.length === 1 ? choices[0]?.message : undefined;
-      const content = message?.content;
-      if (message?.role !== "assistant" || typeof content !== "string" || content.trim().length === 0) {
+      const parsed = parseAssistantResponse(body);
+      if (!parsed.ok) {
         throw new ReviewFailure({
           stage: "model-response",
           reason: "MODEL_RESPONSE_INVALID",
           detail: "OpenCode response is missing assistant content.",
         });
       }
-      return content;
+      return parsed.content;
     } finally {
       clearTimeout(timeout);
     }
