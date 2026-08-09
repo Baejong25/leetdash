@@ -358,3 +358,30 @@ export async function getListDetail(listKey: string) {
 
   return { list, users: rows };
 }
+
+export async function getCatalogProblemDetail(listKey: string) {
+  const list = catalog.lists.find((candidate) => candidate.key === listKey);
+  if (!list) {
+    return null;
+  }
+
+  const users = data.users.filter((user) => user.active).map((user) => ({
+    id: user.id,
+    displayName: user.displayName,
+    githubUsername: user.githubUsername,
+  }));
+  const communitySolutionCounts = getCommunitySolutionCounts();
+  const submissionsByUser = new Map(
+    data.users.map((user) => [user.id, new Map(user.submissions.map((submission) => [submission.problemKey, submission]))]),
+  );
+
+  const items = getListProblems(list).map((item) => ({
+    ...item,
+    submissions: Object.fromEntries(
+      users.map((user) => [user.id, submissionsByUser.get(user.id)?.get(item.problemKey) ?? null]),
+    ),
+    communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
+  }));
+
+  return { list, users, items };
+}
