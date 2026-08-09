@@ -17,14 +17,22 @@ import { mkdir, writeFile as fsWriteFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  isRetryableStatus,
+  openCodeApiModel,
+  openCodeChatCompletionsUrl,
+  openCodeRequestTimeoutMs,
+  parseAssistantResponse,
+} from "./opencode-api-contract.mjs";
+
 const GATEWAY_URL = "https://opencode.ai/zen/go/v1/models";
-const CHAT_COMPLETIONS_URL = "https://opencode.ai/zen/go/v1/chat/completions";
-const FLASH_MODEL = "deepseek-v4-flash";
 const GATEWAY_TIMEOUT_MS = 20_000;
-const FLASH_TIMEOUT_MS = 30_000;
 
 const GATEWAY_LABEL = "OpenCode Go Gateway";
 const FLASH_LABEL = "DeepSeek V4 Flash (AI Review)";
+
+const FLASH_PROMPT = "Reply exactly with: OK";
+const FLASH_MAX_ATTEMPTS = 2;
 
 function badgeFor(up) {
   return up ? { message: "up", color: "brightgreen" } : { message: "down", color: "red" };
@@ -64,34 +72,63 @@ async function checkGateway({ fetchImpl, apiKey }) {
   }
 }
 
-async function checkFlash({ fetchImpl, apiKey }) {
+/**
+ * One flash chat-completions attempt under the shared per-attempt
+ * timeout (openCodeRequestTimeoutMs). Returns { ok: true } on a valid
+ * assistant response, or { ok: false, retryable } where retryable is
+ * true only for timeout/transport failures and the retryable HTTP
+ * statuses (408/425/429/5xx). Invalid JSON and invalid assistant
+ * responses are final. Each attempt owns its own AbortController timer.
+ */
+async function attemptFlash({ fetchImpl, apiKey }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), openCodeRequestTimeoutMs);
   try {
-    const body = await fetchProbe(fetchImpl, CHAT_COMPLETIONS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: FLASH_MODEL,
-        messages: [{ role: "user", content: "Reply exactly with: OK" }],
-        max_tokens: 1,
-        stream: false,
-      }),
-    }, FLASH_TIMEOUT_MS);
-    // Mirrors the review client response validation
-    // (scripts/opencode-review-clients.mjs): structural checks only —
-    // untrusted response content is never executed.
-    const choices = body?.choices;
-    const first = Array.isArray(choices) && choices.length >= 1 ? choices[0] : undefined;
-    const up = body !== null
-      && first?.message?.role === "assistant"
-      && typeof first?.message?.content === "string"
-      && first.message.content.trim().length > 0;
-    return badgeFor(up);
-  } catch {
-    return badgeFor(false);
+    let response;
+    try {
+      response = await fetchImpl(openCodeChatCompletionsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: openCodeApiModel,
+          messages: [{ role: "user", content: FLASH_PROMPT }],
+        }),
+        signal: controller.signal,
+      });
+    } catch {
+      // Timeout or transport failure — retryable.
+      return { ok: false, retryable: true };
+    }
+    if (response.status < 200 || response.status >= 300) {
+      return { ok: false, retryable: isRetryableStatus(response.status) };
+    }
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      // Invalid JSON — final.
+      return { ok: false, retryable: false };
+    }
+    // Mirrors the review client response validation via the shared
+    // contract: structural checks only — untrusted response content is
+    // never executed and never embedded in the result.
+    const parsed = parseAssistantResponse(body);
+    return parsed.ok ? { ok: true } : { ok: false, retryable: false };
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function checkFlash({ fetchImpl, apiKey }) {
+  let outcome = { ok: false, retryable: true };
+  for (let attempt = 1; attempt <= FLASH_MAX_ATTEMPTS; attempt += 1) {
+    outcome = await attemptFlash({ fetchImpl, apiKey });
+    if (outcome.ok || !outcome.retryable) break;
+  }
+  return badgeFor(outcome.ok);
 }
 
 function statusFile({ label, message, color, lastChecked }) {
@@ -142,4 +179,4 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
     });
 }
 
-export { main, runStatusCheck };
+export { checkFlash, main, runStatusCheck };
