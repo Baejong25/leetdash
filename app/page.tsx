@@ -21,7 +21,7 @@ export default async function HomePage() {
             작은 풀이 하나도 스터디의 다음 기록이 됩니다.
           </p>
           <div className="home-actions">
-            <Link className="button primary" href="/lists/top-interview-easy">
+            <Link className="button primary" href="/catalog/top-interview-easy">
               첫 문제 시작하기 <ArrowRight size={17} aria-hidden="true" />
             </Link>
             <Link className="home-secondary-link" href="/statistics">
@@ -73,7 +73,7 @@ export default async function HomePage() {
           <CheckCircle2 size={24} aria-hidden="true" className="panel-icon" />
           <h2>첫 번째 풀이를 기다리고 있어요</h2>
           <p>문제 하나를 해결하고 스터디의 첫 기록을 남겨 보세요.</p>
-          <Link className="button primary" href="/lists/top-interview-easy">문제 목록 둘러보기</Link>
+          <Link className="button primary" href="/catalog/top-interview-easy">문제 목록 둘러보기</Link>
         </section>
       ) : (
         <section className="home-feed" aria-label="최근 풀이 피드">
@@ -105,7 +105,7 @@ export default async function HomePage() {
           <h2 id="home-cta-title">당신의 첫 기록도 여기서 시작할 수 있어요.</h2>
           <p>가볍게 한 문제부터 풀고, 다음 활동 피드의 주인공이 되어 보세요.</p>
         </div>
-        <Link className="button primary" href="/lists/top-interview-easy">문제 목록 둘러보기 <ArrowRight size={17} aria-hidden="true" /></Link>
+        <Link className="button primary" href="/catalog/top-interview-easy">문제 목록 둘러보기 <ArrowRight size={17} aria-hidden="true" /></Link>
       </section>
     </div>
   );
