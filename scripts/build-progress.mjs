@@ -70,8 +70,11 @@ function normalizeRepositoryUrl(value) {
 }
 
 function getRepositoryUrl() {
+  if (process.env.SOURCE_REPOSITORY_URL !== undefined) {
+    return normalizeRepositoryUrl(process.env.SOURCE_REPOSITORY_URL);
+  }
+
   return (
-    normalizeRepositoryUrl(process.env.SOURCE_REPOSITORY_URL) ??
     normalizeRepositoryUrl(process.env.REPOSITORY_URL) ??
     normalizeRepositoryUrl(process.env.URL) ??
     (process.env.GITHUB_REPOSITORY ? `https://github.com/${process.env.GITHUB_REPOSITORY}` : undefined)
