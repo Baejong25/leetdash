@@ -395,6 +395,33 @@ button.primary:hover {
   padding: 8px 32px 8px 11px;
 }
 
+.catalog-user-hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: -4px 18px 16px;
+}
+
+.user-selection-dialog {
+  align-items: center;
+  background: rgb(15 23 42 / 35%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 20;
+}
+
+.user-selection-dialog .panel {
+  margin: 0;
+  max-width: 420px;
+  width: 100%;
+}
+
+.user-selection-dialog .viewer-control {
+  margin: 20px 0 8px;
+}
+
 .viewer-control select:focus {
   border-color: var(--accent);
   outline: 2px solid var(--accent-soft);
