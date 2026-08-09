@@ -83,6 +83,7 @@ describe("review artifact synchronization", () => {
     expect(workflow).toContain(
       "      - name: Sync review artifacts\n"
         + "        if: github.event_name != 'pull_request'\n"
+        + "        timeout-minutes: 15\n"
         + "        run: npm run reviews:sync",
     );
   });
