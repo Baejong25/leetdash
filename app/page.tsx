@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, CheckCircle2, Flame, Users } from "lucide-react";
+import { CatalogEntryCta } from "@/app/components/catalog-entry-cta";
 import { formatDateTime, formatPercent } from "@/lib/format";
 import { formatCatalogListTitle } from "@/lib/i18n";
 import { getDashboardData } from "@/lib/progress";
 
 export default async function HomePage() {
   const data = await getDashboardData();
+  const viewerUsers = data.users.map(({ id, displayName, githubUsername }) => ({ id, displayName, githubUsername }));
   const activeThisWeek = data.users.filter((user) => user.solvedLast7Days > 0).length;
   const averageSolvedPerUser = data.totals.users === 0 ? 0 : Math.round(data.totals.solvedSubmissions / data.totals.users);
   const featuredSubmissions = data.recentSolvedSubmissions.slice(0, 5);
@@ -21,9 +23,9 @@ export default async function HomePage() {
             작은 풀이 하나도 스터디의 다음 기록이 됩니다.
           </p>
           <div className="home-actions">
-            <Link className="button primary" href="/catalog/top-interview-easy">
+            <CatalogEntryCta className="button primary" href="/catalog/top-interview-easy" users={viewerUsers}>
               첫 문제 시작하기 <ArrowRight size={17} aria-hidden="true" />
-            </Link>
+            </CatalogEntryCta>
             <Link className="home-secondary-link" href="/statistics">
               전체 통계 보기 <BarChart3 size={16} aria-hidden="true" />
             </Link>
@@ -73,7 +75,7 @@ export default async function HomePage() {
           <CheckCircle2 size={24} aria-hidden="true" className="panel-icon" />
           <h2>첫 번째 풀이를 기다리고 있어요</h2>
           <p>문제 하나를 해결하고 스터디의 첫 기록을 남겨 보세요.</p>
-          <Link className="button primary" href="/catalog/top-interview-easy">문제 목록 둘러보기</Link>
+          <CatalogEntryCta className="button primary" href="/catalog/top-interview-easy" users={viewerUsers}>문제 목록 둘러보기</CatalogEntryCta>
         </section>
       ) : (
         <section className="home-feed" aria-label="최근 풀이 피드">
@@ -105,7 +107,7 @@ export default async function HomePage() {
           <h2 id="home-cta-title">당신의 첫 기록도 여기서 시작할 수 있어요.</h2>
           <p>가볍게 한 문제부터 풀고, 다음 활동 피드의 주인공이 되어 보세요.</p>
         </div>
-        <Link className="button primary" href="/catalog/top-interview-easy">문제 목록 둘러보기 <ArrowRight size={17} aria-hidden="true" /></Link>
+        <CatalogEntryCta className="button primary" href="/catalog/top-interview-easy" users={viewerUsers}>문제 목록 둘러보기 <ArrowRight size={17} aria-hidden="true" /></CatalogEntryCta>
       </section>
     </div>
   );
