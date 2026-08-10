@@ -40,6 +40,7 @@ type ListData = {
 
 type Props = {
   lists: ListData[];
+  providerLists?: ListData[];
   firstUnsolvedProblemTarget: {
     elementId: string;
     listKey: string;
@@ -93,7 +94,7 @@ function getListProvider(items: ListItem[]): CatalogProvider {
   return items[0]?.problem?.provider ?? "leetcode";
 }
 
-export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, profileUserId }: Props) {
+export function FilterableUserProblemLists({ lists, providerLists = [], firstUnsolvedProblemTarget, profileUserId }: Props) {
   const [difficultyFilters, setDifficultyFilters] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -144,7 +145,7 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
         ) : null}
       </div>
 
-      {lists.map((list) => {
+      {[...lists, ...providerLists].map((list, index) => {
         const provider = getListProvider(list.items);
         const difficultyOptions = difficultyOptionsByProvider[provider];
         const listDifficulty = difficultyFilters[list.key] ?? "all";
@@ -155,8 +156,15 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
             : "";
 
         return (
+          <div key={list.key}>
+          {index === lists.length && providerLists.length > 0 ? (
+            <div className="section-heading provider-section-heading">
+              <p className="eyebrow">PROVIDERS</p>
+              <h2>제공자별 전체 문제</h2>
+              <p className="section-description">Programmers와 SWEA 전체 문제는 카탈로그 진행률과 분리해 표시합니다.</p>
+            </div>
+          ) : null}
           <CatalogProblemList
-            key={list.key}
             title={formatCatalogListTitle(list.title)}
             subtitle={`풀이 완료 ${list.progress.solved}개, 검토 중 ${list.progress.reviewing}개, 건너뜀 ${list.progress.skipped}개${subtitleSuffix}`}
           >
@@ -256,6 +264,7 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
               </div>
             )}
           </CatalogProblemList>
+          </div>
         );
       })}
     </>

@@ -1,5 +1,5 @@
 import { buildActivityCalendar, getSeoulDateKey, type ActivityCalendarWindow } from "@/lib/activity";
-import { catalog, getList, getListProblems, getProblem, type CatalogList } from "@/lib/catalog";
+import { catalog, catalogLists, getList, getListProblems, getProblem, providerLists, type CatalogList } from "@/lib/catalog";
 import progressData from "@/data/progress.json";
 import { FIRST_UNSOLVED_PROBLEM_ELEMENT_ID } from "@/lib/user-problem-focus";
 import { getSelectedSubmission } from "@/lib/submission-selection";
@@ -47,9 +47,26 @@ export type RecentSolvedSubmission = {
   githubUsername: string;
   problemKey: string;
   problemTitle: string;
+  problemProvider: string;
+  problemId: string;
   sourceKey: string;
   listTitle: string;
   submittedAt: string;
+  githubUrl?: string;
+};
+
+export type UserHistoryItem = {
+  id: string;
+  problemKey: string;
+  problemTitle: string;
+  problemProvider: string;
+  problemId: string;
+  sourceKey: string;
+  listTitle: string;
+  status: SubmissionStatus;
+  language?: string;
+  submittedAt?: string;
+  solvedAt?: string;
   githubUrl?: string;
 };
 
@@ -158,6 +175,8 @@ export function buildRecentSolvedSubmissions(users: RecentSubmissionUser[], limi
             githubUsername: user.githubUsername,
             problemKey: submission.problemKey,
             problemTitle: problem.title,
+            problemProvider: problem.provider,
+            problemId: problem.problemId,
             sourceKey: submission.sourceKey,
             listTitle: list.title,
             submittedAt: submission.submittedAt ?? "",
@@ -174,12 +193,45 @@ export function buildRecentSolvedSubmissions(users: RecentSubmissionUser[], limi
     .slice(0, limit);
 }
 
+export function buildUserHistory(user: ProgressData["users"][number]): UserHistoryItem[] {
+  const problemKeys = new Set(user.submissions.map((submission) => submission.problemKey));
+  return [...problemKeys]
+    .map((problemKey) => getSelectedSubmission(user, problemKey))
+    .filter((submission): submission is Submission => submission !== null)
+    .map((submission) => {
+      const problem = getProblem(submission.problemKey);
+      const list = getList(submission.sourceKey);
+      return {
+        id: submission.id,
+        problemKey: submission.problemKey,
+        problemTitle: problem.title,
+        problemProvider: problem.provider,
+        problemId: problem.problemId,
+        sourceKey: submission.sourceKey,
+        listTitle: list.title,
+        status: submission.status,
+        ...(submission.language ? { language: submission.language } : {}),
+        ...(submission.submittedAt ? { submittedAt: submission.submittedAt } : {}),
+        ...(submission.solvedAt ? { solvedAt: submission.solvedAt } : {}),
+        ...(submission.githubUrl ? { githubUrl: submission.githubUrl } : {}),
+      };
+    })
+    .sort((left, right) => {
+      const leftDate = left.submittedAt ?? left.solvedAt;
+      const rightDate = right.submittedAt ?? right.solvedAt;
+      return (
+        (rightDate ? new Date(rightDate).getTime() : 0) - (leftDate ? new Date(leftDate).getTime() : 0) ||
+        left.problemTitle.localeCompare(right.problemTitle)
+      );
+    });
+}
+
 function buildUserRow(
   user: User & { submissions: Submission[]; activity?: ActivityDay[] },
   endDate: Date | string = new Date(),
 ): UserDashboardRow {
   const submissions = new Map(user.submissions.map((submission) => [submission.problemKey, submission]));
-  const progress = catalog.lists.map((list) => summarizeList(list, submissions));
+  const progress = catalogLists.map((list) => summarizeList(list, submissions));
   const activity = user.activity ?? [];
   const activityCalendar = buildActivityCalendar(activity, 35, endDate);
   const recentActivityCalendar = buildActivityCalendar(activity, 7, endDate);
@@ -247,7 +299,7 @@ export async function getDashboardData() {
     0,
   );
 
-  const listAverages = catalog.lists.map((list) => {
+  const listAverages = catalogLists.map((list) => {
     const perUser = rows.map((row) => row.progress.find((progress) => progress.key === list.key)?.percent ?? 0);
     const average = perUser.length === 0 ? 0 : perUser.reduce((sum, value) => sum + value, 0) / perUser.length;
     return { key: list.key, title: list.title, average };
@@ -262,7 +314,7 @@ export async function getDashboardData() {
     users: rows,
     totals: {
       users: totalUsers,
-      lists: catalog.lists.length,
+      lists: catalogLists.length,
       uniqueProblems: catalog.problems.length,
       overallCompletionPercent: totalTrackedProgress === 0 ? 0 : (solvedTrackedProgress / totalTrackedProgress) * 100,
       solvedSubmissions: solvedSubmissions.length,
@@ -296,7 +348,7 @@ export async function getUserDetail(userId: string) {
 
   const communitySolutionCounts = getCommunitySolutionCounts();
   const submissions = new Map(user.submissions.map((submission) => [submission.problemKey, submission]));
-  const lists = catalog.lists
+  const lists = catalogLists
     .map((list) => ({
       ...list,
       progress: summarizeList(list, submissions),
@@ -307,6 +359,15 @@ export async function getUserDetail(userId: string) {
       })),
     }))
     .sort((a, b) => b.progress.solved - a.progress.solved);
+  const providers = providerLists.map((list) => ({
+    ...list,
+    progress: summarizeList(list, submissions),
+    items: getListProblems(list).map((item) => ({
+      ...item,
+      submission: submissions.get(item.problemKey) ?? null,
+      communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
+    })),
+  }));
   let firstUnsolvedProblemTarget: FirstUnsolvedProblemTarget | null = null;
 
   for (const list of lists) {
@@ -331,13 +392,15 @@ export async function getUserDetail(userId: string) {
   return {
     user,
     lists,
+    providers,
+    history: buildUserHistory(user),
     activityCalendar: buildActivityCalendar(user.activity ?? [], 90),
     firstUnsolvedProblemTarget,
   };
 }
 
 export async function getListDetail(listKey: string) {
-  const list = catalog.lists.find((candidate) => candidate.key === listKey);
+  const list = catalogLists.find((candidate) => candidate.key === listKey);
   if (!list) {
     return null;
   }
@@ -360,7 +423,7 @@ export async function getListDetail(listKey: string) {
 }
 
 export async function getCatalogProblemDetail(listKey: string) {
-  const list = catalog.lists.find((candidate) => candidate.key === listKey);
+  const list = catalogLists.find((candidate) => candidate.key === listKey);
   if (!list) {
     return null;
   }
