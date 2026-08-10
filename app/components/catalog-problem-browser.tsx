@@ -128,7 +128,7 @@ export function CatalogProblemBrowser({ items, users }: { items: Item[]; users: 
                 <td>{formatDate(submission?.solvedAt)}</td>
                 <td><div className="actions">
                   {comparisonHref ? <Link className="button" href={comparisonHref}><GitCompare size={16} aria-hidden="true" />비교</Link> : null}
-                  <a className="button" href={item.problem.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} aria-hidden="true" />{providerLabels[item.problem.provider]}</a>
+                  <a className="button catalog-source-button" href={item.problem.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} aria-hidden="true" />{providerLabels[item.problem.provider]}</a>
                   {submission?.githubUrl ? <a className="button" href={submission.githubUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} aria-hidden="true" />GitHub</a> : null}
                 </div></td>
               </tr>;

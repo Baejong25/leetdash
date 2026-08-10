@@ -127,7 +127,7 @@ async function listRelativeFiles(dir) {
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      for (const nested of await listRelativeFiles(full)) files.push(path.join(entry.name, nested));
+      for (const nested of await listRelativeFiles(full)) files.push(`${entry.name}/${nested}`);
     } else {
       files.push(entry.name);
     }

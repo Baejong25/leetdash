@@ -198,6 +198,19 @@ button.primary:hover {
   background: var(--accent-strong);
 }
 
+.catalog-source-button {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  box-shadow: 0 0 0 2px rgb(15 118 110 / 12%);
+}
+
+.catalog-source-button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
 .stats-grid {
   display: grid;
   gap: 14px;
