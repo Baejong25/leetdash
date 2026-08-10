@@ -10,7 +10,6 @@ class Solution {
         ArrayList<Integer> answer = new ArrayList<>(); 
         
         int carpet = brown + yellow; 
-        int x = 0, y = 0;
         ArrayList<Integer> divisorX = new ArrayList<>(); 
         ArrayList<Integer> divisorY = new ArrayList<>(); 
         
