@@ -69,6 +69,7 @@ export function ProblemSolutionExplorer({
   const [reviewLineRefs, setReviewLineRefs] = useState<
     readonly LineReference[] | undefined
   >(undefined);
+  const [hoveredLine, setHoveredLine] = useState<number | null>(null);
   const fetchIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const userInitiatedRef = useRef(false);
@@ -94,6 +95,7 @@ export function ProblemSolutionExplorer({
         setViewerState({ status: "loading" });
       }
       setReviewLineRefs(undefined);
+      setHoveredLine(null);
       return;
     }
 
@@ -111,6 +113,7 @@ export function ProblemSolutionExplorer({
     abortRef.current = controller;
     setViewerState({ status: "loading" });
     setReviewLineRefs(undefined);
+    setHoveredLine(null);
 
     loadRawSource({
       url: rawUrl,
@@ -259,7 +262,9 @@ export function ProblemSolutionExplorer({
               <div className={styles.codeColumn}>
                 <SolutionCodeViewer
                   state={displayViewerState}
+                  language={selectedSolver.submission.language}
                   permalink={selectedSolver.submission.solutionPermalink ?? null}
+                  onLineHover={setHoveredLine}
                 />
               </div>
               <div className={styles.reviewColumn}>
@@ -267,6 +272,7 @@ export function ProblemSolutionExplorer({
                   pathKey={selectedSolver.submission.solutionPathKey ?? null}
                   contentKey={selectedSolver.submission.solutionContentKey ?? null}
                   onFocusLine={handleReviewFocus}
+                  hoveredLine={hoveredLine}
                 />
               </div>
             </div>

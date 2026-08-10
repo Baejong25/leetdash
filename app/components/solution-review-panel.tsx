@@ -43,6 +43,7 @@ export type SolutionReviewPanelProps = {
   contentKey: string | null;
   basePath?: string;
   onFocusLine: (ref: LineReference) => void;
+  hoveredLine?: number | null;
 };
 
 export function SolutionReviewPanel({
@@ -50,6 +51,7 @@ export function SolutionReviewPanel({
   contentKey,
   basePath,
   onFocusLine,
+  hoveredLine = null,
 }: SolutionReviewPanelProps) {
   const [view, setView] = useState<ReviewPanelView>(
     pathKey !== null && contentKey !== null ? { kind: "loading" } : { kind: "idle" },
@@ -118,7 +120,7 @@ export function SolutionReviewPanel({
         <h2>리뷰</h2>
       </div>
       <div className={styles.body} role="region" aria-label="솔루션 리뷰">
-        <ReviewContentView view={view} onFocusLine={handleFocusLine} />
+        <ReviewContentView view={view} onFocusLine={handleFocusLine} hoveredLine={hoveredLine} />
       </div>
     </section>
   );
@@ -129,9 +131,11 @@ export function SolutionReviewPanel({
 function ReviewContentView({
   view,
   onFocusLine,
+  hoveredLine,
 }: {
   view: ReviewPanelView;
   onFocusLine: (ref: LineReference) => void;
+  hoveredLine: number | null;
 }) {
   switch (view.kind) {
     case "loading":
@@ -143,8 +147,11 @@ function ReviewContentView({
 
     case "available": {
       const { artifact } = view;
+      const hasHoveredReference = hoveredLine !== null && artifact.lineReferences.some(
+        (ref) => hoveredLine >= ref.start && hoveredLine <= ref.end,
+      );
       return (
-        <>
+        <div className={hasHoveredReference ? styles.reviewBlockActive : styles.reviewBlock}>
           {artifact.text !== null ? (
             <p className={styles.text} data-testid="review-text">
               {artifact.text}
@@ -177,7 +184,7 @@ function ReviewContentView({
           >
             GitHub에서 리뷰 보기
           </a>
-        </>
+        </div>
       );
     }
 

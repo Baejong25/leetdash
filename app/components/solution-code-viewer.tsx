@@ -7,6 +7,7 @@ import {
   normalizeRanges,
   splitLines,
   targetLine,
+  tokenizeCodeLine,
   type SolutionCodeViewerProps,
 } from "@/app/components/solution-code-viewer-helpers";
 import styles from "./solution-code-viewer.module.css";
@@ -48,8 +49,10 @@ function surfaceClass(className?: string) {
 
 export function SolutionCodeViewer({
   state,
+  language,
   permalink,
   className,
+  onLineHover,
 }: SolutionCodeViewerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -193,6 +196,11 @@ export function SolutionCodeViewer({
                     data-line={lineNumber}
                     className={rowClasses}
                     role="row"
+                    onMouseEnter={() => onLineHover?.(lineNumber)}
+                    onMouseLeave={() => onLineHover?.(null)}
+                    onFocus={() => onLineHover?.(lineNumber)}
+                    onBlur={() => onLineHover?.(null)}
+                    tabIndex={onLineHover ? 0 : undefined}
                   >
                     <span
                       className={styles.lineNumber}
@@ -202,7 +210,11 @@ export function SolutionCodeViewer({
                       {lineNumber}
                     </span>
                     <span className={styles.lineContent} role="cell">
-                      {content}
+                      {tokenizeCodeLine(content, language ?? "").map((token, tokenIndex) => (
+                        <span key={`${lineNumber}-${tokenIndex}`} className={styles[`token-${token.kind}`]}>
+                          {token.text}
+                        </span>
+                      ))}
                     </span>
                   </div>
                 );

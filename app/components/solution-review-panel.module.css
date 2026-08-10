@@ -23,6 +23,19 @@
   white-space: pre-wrap;
 }
 
+.reviewBlock {
+  border-radius: 8px;
+  padding: 12px;
+  margin: -12px;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.reviewBlockActive {
+  composes: reviewBlock;
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .noneComment {
   color: var(--muted);
   font-size: 15px;
