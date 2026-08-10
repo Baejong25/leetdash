@@ -1,4 +1,4 @@
-import type { LineReference } from "@/lib/solution-assets";
+import type { LineReference, ReviewItem } from "@/lib/solution-assets";
 
 export type SyntaxTokenKind =
   | "plain"
@@ -124,6 +124,24 @@ export function highlightSet(
   return set;
 }
 
+/** Resolve a code line to one review. More specific ranges win when reviews overlap. */
+export function findReviewIndexForLine(
+  reviews: readonly ReviewItem[],
+  line: number,
+): number | null {
+  let match: { index: number; span: number } | null = null;
+  for (let index = 0; index < reviews.length; index += 1) {
+    const review = reviews[index]!;
+    const { start, end } = review.lineReference;
+    if (line < start || line > end) continue;
+    const span = end - start;
+    if (match === null || span < match.span) {
+      match = { index, span };
+    }
+  }
+  return match === null ? null : match.index;
+}
+
 // ── Discriminated state type ───────────────────────────────────────────────
 
 export type SolutionCodeViewerState =
@@ -150,5 +168,7 @@ export interface SolutionCodeViewerProps {
   /** GitHub permalink to the source file. Shown in every non-unsolved state. */
   permalink?: string | null;
   className?: string;
+  /** Transient range synchronized with a hovered/focused review item. */
+  activeLineRef?: LineReference | null;
   onLineHover?: (line: number | null) => void;
 }

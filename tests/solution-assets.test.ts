@@ -113,6 +113,10 @@ const artifactJson = {
   updatedAt: "2026-08-08T00:00:00.000Z",
   text: "리뷰 코멘트 없음.",
   lineReferences: [{ start: 15, end: 15 }, { start: 19, end: 19 }],
+  reviews: [
+    { text: "L15 첫 번째 리뷰", lineReference: { start: 15, end: 15 } },
+    { text: "L19 두 번째 리뷰", lineReference: { start: 19, end: 19 } },
+  ],
 };
 
 /** Mock that honors abort signals the way real fetch does (rejects with AbortError). */
@@ -594,7 +598,7 @@ describe("lazy review loader", () => {
         return textResponse(JSON.stringify(completeIndex), { headers: { "content-type": "application/json" } });
       }
       return textResponse(
-        JSON.stringify({ ...artifactJson, text: null, lineReferences: [] }),
+        JSON.stringify({ ...artifactJson, text: null, lineReferences: [], reviews: [] }),
         { headers: { "content-type": "application/json" } },
       );
     });
@@ -720,6 +724,22 @@ describe("lazy review loader", () => {
     });
     const result = await loadReview({ pathKey, contentKey });
     expect(result).toEqual({ status: "error" });
+  });
+
+  it("returns error for a review item with an invalid range", async () => {
+    mockFetch((url) => {
+      if (url.endsWith("/index.json")) {
+        return textResponse(JSON.stringify(completeIndex), { headers: { "content-type": "application/json" } });
+      }
+      return textResponse(
+        JSON.stringify({
+          ...artifactJson,
+          reviews: [{ text: "invalid", lineReference: { start: 20, end: 10 } }],
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    });
+    expect(await loadReview({ pathKey, contentKey })).toEqual({ status: "error" });
   });
 
   it("uses the configured basePath for index and artifact requests", async () => {

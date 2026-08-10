@@ -166,7 +166,7 @@ describe("parseReviewArtifact: managed bot comment gate", () => {
 });
 
 describe("parseReviewArtifact: safe artifact shape", () => {
-  it("emits only the six safe fields for a current file review", () => {
+  it("emits separate review items paired with their single-line references", () => {
     const updatedAt = "2026-08-08T09:00:00Z";
     const artifact = parseReviewArtifact(managedComment({ id: 5213445035, updatedAt }));
 
@@ -180,8 +180,18 @@ describe("parseReviewArtifact: safe artifact shape", () => {
         { start: 15, end: 15 },
         { start: 19, end: 19 },
       ],
+      reviews: [
+        {
+          text: pr126Prose.split("\n\n")[0],
+          lineReference: { start: 15, end: 15 },
+        },
+        {
+          text: pr126Prose.split("\n\n")[1],
+          lineReference: { start: 19, end: 19 },
+        },
+      ],
     });
-    expect(Object.keys(artifact).sort()).toEqual(["commentUrl", "contentKey", "lineReferences", "pathKey", "text", "updatedAt"]);
+    expect(Object.keys(artifact).sort()).toEqual(["commentUrl", "contentKey", "lineReferences", "pathKey", "reviews", "text", "updatedAt"]);
     expect(artifact.text).not.toContain("워크플로");
     expect(artifact.text).not.toContain("커밋:");
     expect(artifact.text).not.toContain("파일:");
@@ -203,6 +213,7 @@ describe("parseReviewArtifact: safe artifact shape", () => {
       updatedAt: "2026-08-08T09:00:00Z",
       text: null,
       lineReferences: [],
+      reviews: [],
     });
 
     const padded = parseReviewArtifact(
@@ -222,13 +233,45 @@ describe("parseReviewArtifact: safe artifact shape", () => {
       { start: 15, end: 15 },
       { start: 17, end: 19 },
     ]);
+    expect(artifact?.reviews).toHaveLength(3);
+    expect(artifact?.reviews[0]).toMatchObject({ lineReference: { start: 17, end: 19 } });
+    expect(artifact?.reviews[0].text).toContain("sum += arr[i]");
     expect(artifact?.text).toContain("i < n");
   });
 
   it("drops invalid line anchors (line zero, reversed ranges, oversized numbers)", () => {
-    const prose = "L0 `x` L19-L15 `y` L9999999999 `z` L15 `ok`";
+    const prose = [
+      "L0 `x`",
+      "L19-L15 `y`",
+      "L9999999999 `z`",
+      "L15 `ok`",
+    ].join("\n");
     const artifact = parseReviewArtifact(managedComment({ id: 41, updatedAt: "2026-08-08T09:00:00Z", prose }));
     expect(artifact?.lineReferences).toEqual([{ start: 15, end: 15 }]);
+    expect(artifact?.reviews).toEqual([
+      { text: "L15 `ok`", lineReference: { start: 15, end: 15 } },
+    ]);
+  });
+
+  it("does not split a range review on line-like text inside a fenced code block", () => {
+    const prose = [
+      "L10-L13 ```text",
+      "L12 is source content, not another review",
+      "``` [분류: 스타일] 범위 리뷰",
+      "L20 `return result;` [분류: 정확성] 단일 줄 리뷰",
+    ].join("\n");
+    const artifact = parseReviewArtifact(managedComment({ id: 411, updatedAt: "2026-08-08T09:00:00Z", prose }));
+
+    expect(artifact?.reviews).toEqual([
+      {
+        text: prose.split("\nL20")[0],
+        lineReference: { start: 10, end: 13 },
+      },
+      {
+        text: "L20 `return result;` [분류: 정확성] 단일 줄 리뷰",
+        lineReference: { start: 20, end: 20 },
+      },
+    ]);
   });
 
   it("decodes exactly one layer of producer entities so text is readable", () => {
