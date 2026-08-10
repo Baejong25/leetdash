@@ -113,18 +113,12 @@ export default async function StatisticsPage() {
                           </a>
                         </div>
                         <div>
-                          {submission.githubUrl ? (
-                            <a
-                              className="problem-title problem-link"
-                              href={submission.githubUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {submission.problemTitle}
-                            </a>
-                          ) : (
-                            <span className="problem-title">{submission.problemTitle}</span>
-                          )}
+                          <Link
+                            className="problem-title problem-link"
+                            href={`/problems/${encodeURIComponent(submission.problemProvider)}/${encodeURIComponent(submission.problemId)}?user=${encodeURIComponent(submission.userId)}`}
+                          >
+                            {submission.problemTitle}
+                          </Link>
                           <div className="muted">{formatCatalogListTitle(submission.listTitle)}</div>
                         </div>
                         <div className="recent-submission-time">{formatDateTime(submission.submittedAt)}</div>

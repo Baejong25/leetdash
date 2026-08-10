@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import { CatalogProblemBrowser } from "@/app/components/catalog-problem-browser";
 import { ListUsersTable } from "@/app/components/list-users-table";
-import { catalog } from "@/lib/catalog";
+import { catalogLists } from "@/lib/catalog";
 import { formatCatalogListTitle } from "@/lib/i18n";
 import { getCatalogProblemDetail, getListDetail } from "@/lib/progress";
 
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return catalog.lists.map((list) => ({ catalogKey: list.key }));
+  return catalogLists.map((list) => ({ catalogKey: list.key }));
 }
 
 export default async function CatalogDetailPage({ params }: { params: Promise<{ catalogKey: string }> }) {
