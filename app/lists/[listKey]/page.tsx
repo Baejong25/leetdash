@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 import { ListUsersTable } from "@/app/components/list-users-table";
-import { catalog } from "@/lib/catalog";
+import { catalogLists } from "@/lib/catalog";
 import { formatCatalogListTitle } from "@/lib/i18n";
 import { getListDetail } from "@/lib/progress";
 
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return catalog.lists.map((list) => ({ listKey: list.key }));
+  return catalogLists.map((list) => ({ listKey: list.key }));
 }
 
 export default async function ListDetailPage({ params }: { params: Promise<{ listKey: string }> }) {

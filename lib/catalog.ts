@@ -37,6 +37,14 @@ export type ProblemCatalog = {
 
 export const catalog = catalogData as ProblemCatalog;
 
+export const providerListKeys = new Set(["leetcode", "programmers", "swea"]);
+export const catalogLists = catalog.lists.filter((list) => !providerListKeys.has(list.key));
+export const providerLists = catalog.lists.filter((list) => providerListKeys.has(list.key));
+
+export function isProviderList(list: CatalogList) {
+  return providerListKeys.has(list.key);
+}
+
 export const problemByKey = new Map(catalog.problems.map((problem) => [problem.problemKey, problem]));
 export const listByKey = new Map(catalog.lists.map((list) => [list.key, list]));
 export const catalogProblemKeys = new Set(catalog.problems.map((problem) => problem.problemKey));

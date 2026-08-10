@@ -1,0 +1,211 @@
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  contain: layout paint;
+  overflow: hidden;
+}
+
+.header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.headerLabel {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.headerActions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.copyButton {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--strong-border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 680;
+  gap: 4px;
+  min-height: 30px;
+  padding: 4px 10px;
+}
+
+.copyButton:hover {
+  border-color: var(--accent);
+}
+
+.copyButton:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+}
+
+.permalink {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.permalink:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.permalink:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.scroller {
+  overflow-x: auto;
+  overflow-y: clip;
+}
+
+/* Ensures long lines scroll without pushing the panel wider */
+.lineTable {
+  border-collapse: collapse;
+  min-width: 100%;
+  width: max-content;
+}
+
+.lineRow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  transition: background-color 120ms ease;
+}
+
+.lineRow:nth-child(even) {
+  background: transparent;
+}
+
+.lineNumber {
+  color: var(--muted);
+  min-width: 48px;
+  padding: 0 16px 0 12px;
+  text-align: right;
+  user-select: none;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.lineContent {
+  color: var(--text);
+  padding: 0 16px 0 0;
+  vertical-align: top;
+  white-space: pre;
+}
+
+.lineRow:hover {
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+}
+
+.lineRow:focus-visible {
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.token-keyword { color: #8b5cf6; }
+.token-type { color: #0f766e; }
+.token-string { color: #b45309; }
+.token-number { color: #2563eb; }
+.token-comment { color: #7a8796; font-style: italic; }
+.token-function { color: #0369a1; }
+.token-operator { color: #c2410c; }
+.token-punctuation { color: var(--muted-strong); }
+
+.highlight {
+  background: var(--accent-soft);
+}
+
+.target {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.target:focus {
+  outline: none;
+}
+
+.stateMessage {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.errorMessage {
+  composes: stateMessage;
+  color: var(--danger);
+}
+
+.oversizeMessage {
+  composes: stateMessage;
+  color: var(--warn);
+}
+
+.loadingSkeleton {
+  padding: 16px;
+}
+
+.skeletonLine {
+  background: var(--surface-muted);
+  border-radius: 4px;
+  height: 16px;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.skeletonLine:last-child {
+  margin-bottom: 0;
+  width: 60%;
+}
+
+.skeletonLine:nth-child(odd) {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeletonLine:nth-child(even) {
+  animation: skeletonPulse 1.5s ease-in-out 0.3s infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine:nth-child(odd),
+  .skeletonLine:nth-child(even) {
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
+.copyStatus {
+  /* aria-live region — visually hidden but accessible */
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

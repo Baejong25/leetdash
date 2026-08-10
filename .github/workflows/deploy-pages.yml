@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -61,13 +62,35 @@ jobs:
         if: github.event_name != 'pull_request' || steps.pr-scope.outputs.submission_only != 'true'
         run: npm test
 
-      - name: Build static site
-        if: github.event_name != 'pull_request' || steps.pr-scope.outputs.submission_only != 'true'
+      - name: Generate progress data (deploy)
+        if: github.event_name != 'pull_request'
+        run: npm run build:data
+        env:
+          SOURCE_REPOSITORY_URL: https://github.com/whoisyourbias/leetdash
+          BRANCH: master
+          SOURCE_REVISION: ${{ github.sha }}
+
+      - name: Full build (pull request)
+        if: github.event_name == 'pull_request' && steps.pr-scope.outputs.submission_only != 'true'
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /leetdash
           SOURCE_REPOSITORY_URL: https://github.com/whoisyourbias/leetdash
           BRANCH: master
+
+      - name: Sync review artifacts
+        if: github.event_name != 'pull_request'
+        timeout-minutes: 15
+        run: npm run reviews:sync
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build static site
+        if: github.event_name != 'pull_request'
+        run: npm run build:site
+        env:
+          NEXT_PUBLIC_BASE_PATH: /leetdash
 
       - name: Disable Jekyll
         if: github.event_name != 'pull_request'

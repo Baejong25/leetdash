@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActivityCalendar } from "@/app/components/activity-calendar";
 import { FilterableUserProblemLists } from "@/app/components/filterable-user-problem-lists";
+import { UserProblemHistory } from "@/app/components/user-problem-history";
 import { FirstUnsolvedProblemScroller } from "@/app/components/first-unsolved-problem-scroller";
 import { formatDateKey, formatPercent } from "@/lib/format";
 import { getGithubProfileUrl } from "@/lib/github";
@@ -26,7 +27,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ use
     notFound();
   }
 
-  const { user, lists, activityCalendar } = detail;
+  const { user, lists, providers, history, activityCalendar } = detail;
   const { firstUnsolvedProblemTarget } = detail;
 
   return (
@@ -83,7 +84,14 @@ export default async function UserDetailPage({ params }: { params: Promise<{ use
         </div>
       </section>
 
-      <FilterableUserProblemLists lists={lists} firstUnsolvedProblemTarget={firstUnsolvedProblemTarget} />
+      <FilterableUserProblemLists
+        lists={lists}
+        providerLists={providers}
+        firstUnsolvedProblemTarget={firstUnsolvedProblemTarget}
+        profileUserId={user.id}
+      />
+
+      <UserProblemHistory history={history} userId={user.id} />
 
     </div>
   );

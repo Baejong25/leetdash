@@ -1,0 +1,97 @@
+.body {
+  min-height: 80px;
+  padding: 16px 18px;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.statusDetail {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 0 0;
+}
+
+.text {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 0 12px 0;
+  white-space: pre-wrap;
+}
+
+.reviewBlock {
+  border-radius: 8px;
+  padding: 12px;
+  margin: -12px;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.reviewBlockActive {
+  composes: reviewBlock;
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.noneComment {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 0 12px 0;
+}
+
+.lineButtons {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.lineButton {
+  font-size: 12px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.lineButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.commentLink {
+  display: inline-block;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.commentLink:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.warning {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.warning .status {
+  color: var(--warn);
+}
+
+.error {
+  background: var(--danger-soft);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.error .status {
+  color: var(--danger);
+}
