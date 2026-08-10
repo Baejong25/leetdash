@@ -1,0 +1,46 @@
+name: Inactive User Reminders
+
+on:
+  schedule:
+    # 09:00 Asia/Seoul (GitHub cron uses UTC).
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: inactive-user-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Generate current progress data
+        run: node scripts/build-progress.mjs
+        env:
+          SOURCE_REPOSITORY_URL: https://github.com/whoisyourbias/leetdash
+          BRANCH: master
+          SOURCE_REVISION: ${{ github.sha }}
+
+      - name: Comment on the reminder issue
+        run: node scripts/send-inactive-reminders.mjs
+        env:
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REMINDER_ISSUE_NUMBER: ${{ vars.REMINDER_ISSUE_NUMBER }}
+          DASHBOARD_BASE_URL: https://whoisyourbias.github.io/leetdash

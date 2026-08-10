@@ -180,6 +180,12 @@ npm run dev
 npm run progress:build
 ```
 
+## 미풀이 사용자 알림
+
+`.github/workflows/inactive-reminders.yml`은 매일 오전 9시(Asia/Seoul)에 실행되어 고정 GitHub Issue에 미풀이 사용자를 멘션합니다. 알림 대상은 `data/users.json`에 `active: true`가 명시되어 있고 풀이 이력이 있는 사용자입니다. 마지막 풀이 후 3일째, 7일째, 이후 7일마다 알립니다.
+
+운영자는 알림용 Issue를 하나 만든 뒤 저장소의 `Settings > Secrets and variables > Actions > Variables`에서 `REMINDER_ISSUE_NUMBER`를 해당 Issue 번호로 등록합니다. 같은 날짜의 workflow를 재실행해도 관리 마커를 확인하여 댓글을 중복 작성하지 않습니다. 수동 검증은 Actions의 `Inactive User Reminders` workflow에서 `Run workflow`로 실행합니다.
+
 `npm run build`는 항상 `next build` 전에 진행 데이터 생성기를 실행합니다.
 
 진행 데이터 생성기는 Git 히스토리에서 각 풀이 파일의 최초 추가 커밋 날짜를 읽어 사용자별 활동 달력도 만듭니다. 풀이 파일이 없고 `meta.json`만 있는 완료 제출은 `meta.json`의 최초 추가 커밋 날짜를 사용합니다. 날짜는 Asia/Seoul 기준 일자로 묶이며, Git 히스토리를 읽을 수 없는 로컬 환경에서는 활동 달력이 비어 있을 수 있지만 빌드는 계속 진행됩니다.
