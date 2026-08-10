@@ -1127,6 +1127,95 @@ tr:last-child td {
   flex: 0 0 auto;
 }
 
+.home-help-button {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--accent-strong);
+  font-size: 13px;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 9;
+}
+
+.home-onboarding-backdrop {
+  align-items: center;
+  background: rgb(15 23 42 / 48%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 30;
+}
+
+.home-onboarding-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  max-width: 560px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.home-onboarding-progress {
+  align-items: center;
+  background: var(--surface-muted);
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  font-weight: 760;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.home-onboarding-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.home-onboarding-dots span {
+  background: var(--strong-border);
+  border-radius: 999px;
+  height: 7px;
+  width: 7px;
+}
+
+.home-onboarding-dots span.active {
+  background: var(--accent);
+  width: 22px;
+}
+
+.home-onboarding-content {
+  padding: 34px 32px 28px;
+}
+
+.home-onboarding-content h2 {
+  font-size: 28px;
+  letter-spacing: -0.04em;
+  margin-bottom: 12px;
+}
+
+.home-onboarding-content p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.home-onboarding-actions {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+
+.home-onboarding-navigation {
+  display: flex;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .shell-header,
   .page-header {
@@ -1233,6 +1322,35 @@ tr:last-child td {
 
   .home-bottom-cta {
     padding: 26px 22px;
+  }
+
+  .home-help-button {
+    bottom: 14px;
+    right: 14px;
+  }
+
+  .home-onboarding-content {
+    padding: 28px 22px 24px;
+  }
+
+  .home-onboarding-content h2 {
+    font-size: 24px;
+  }
+
+  .home-onboarding-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 12px;
+  }
+
+  .home-onboarding-actions > .button,
+  .home-onboarding-navigation,
+  .home-onboarding-navigation .button {
+    width: 100%;
+  }
+
+  .home-onboarding-navigation .button {
+    justify-content: center;
   }
 }
 

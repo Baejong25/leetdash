@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BarChart3, CheckCircle2, Flame, Users } from "lucide-react";
 import { CatalogEntryCta } from "@/app/components/catalog-entry-cta";
+import { HomeOnboarding } from "@/app/components/home-onboarding";
 import { formatPercent, formatSnapshotDateTime } from "@/lib/format";
 import { formatCatalogListTitle } from "@/lib/i18n";
 import { getDashboardData } from "@/lib/progress";
@@ -11,9 +12,30 @@ export default async function HomePage() {
   const activeThisWeek = data.users.filter((user) => user.solvedLast7Days > 0).length;
   const averageSolvedPerUser = data.totals.users === 0 ? 0 : Math.round(data.totals.solvedSubmissions / data.totals.users);
   const featuredSubmissions = data.recentSolvedSubmissions.slice(0, 5);
+  const onboardingSlides = [
+    {
+      title: "참여자 등록",
+      description: "GitHub 아이디를 운영자에게 전달해 참여자로 등록하세요. 등록 후 풀이 기록이 대시보드에 표시됩니다.",
+      href: "/admin",
+      cta: "등록 안내 보기",
+    },
+    {
+      title: "카탈로그에서 문제 선택",
+      description: "카탈로그에서 목록과 난이도, 풀이 상태를 확인하고 풀고 싶은 문제를 선택하세요.",
+      href: "/catalog/top-interview-easy",
+      cta: "카탈로그 보기",
+    },
+    {
+      title: "문제 푼 것을 GitHub에 업로드",
+      description: "Fork한 저장소의 작업 브랜치에 풀이를 추가하고 Pull Request를 보내면 검증 후 대시보드에 반영됩니다.",
+      href: "https://github.com/whoisyourbias/leetdash#제출-규칙",
+      cta: "제출 방법 보기",
+    },
+  ] as const;
 
   return (
     <div className="home-page">
+      <HomeOnboarding slides={onboardingSlides} />
       <section className="home-hero" aria-labelledby="home-title">
         <div className="home-hero-copy">
           <p className="eyebrow">함께 풀고, 함께 성장하는 스터디</p>
