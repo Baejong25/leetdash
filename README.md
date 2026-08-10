@@ -27,6 +27,7 @@ AI 리뷰 API는 `deepseek-v4-flash` 모델을 OpenCode Go 게이트웨이(`http
 | Top Interview Questions Easy | `top-interview-easy` | 문제 고유 LeetCode 번호 | `submissions/<githubUsername>/top-interview-easy/66/solution.ts` |
 | LeetCode 75 | `leetcode-75` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/leetcode-75/1768/solution.ts` |
 | Top Interview 150 | `top-interview-150` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/top-interview-150/88/solution.ts` |
+| LeetCode | `leetcode` | 문제 고유 LeetCode 번호 | `submissions/<githubUsername>/leetcode/1/solution.ts` |
 | Programmers | `programmers` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers/12906/solution.java` |
 | 프로그래머스 고득점 Kit | `programmers-high-score-kit` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers-high-score-kit/42576/solution.java` |
 | SWEA | `swea` | SWEA 문제 번호 | `submissions/<githubUsername>/swea/1206/solution.py` |
@@ -102,6 +103,9 @@ submissions/
     top-interview-150/
       88/
         solution.py
+    leetcode/
+      1/
+        solution.ts
     programmers/
       12906/
         solution.java
@@ -151,6 +155,7 @@ c, cc, cpp, cs, dart, go, java, js, kt, php, py, rb, rs, scala, sql, swift, ts
 - Top Interview Questions Easy
 - LeetCode 75
 - Top Interview 150
+- LeetCode
 - Programmers
 - 프로그래머스 고득점 Kit
 - SWEA
