@@ -360,13 +360,9 @@ export async function getUserDetail(userId: string) {
     }))
     .sort((a, b) => b.progress.solved - a.progress.solved);
   const providers = providerLists.map((list) => ({
-    ...list,
+    key: list.key,
+    title: list.title,
     progress: summarizeList(list, submissions),
-    items: getListProblems(list).map((item) => ({
-      ...item,
-      submission: submissions.get(item.problemKey) ?? null,
-      communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
-    })),
   }));
   let firstUnsolvedProblemTarget: FirstUnsolvedProblemTarget | null = null;
 
@@ -396,6 +392,43 @@ export async function getUserDetail(userId: string) {
     history: buildUserHistory(user),
     activityCalendar: buildActivityCalendar(user.activity ?? [], 90),
     firstUnsolvedProblemTarget,
+  };
+}
+
+export async function getProviderProblemDetail(providerKey: string, page = 1, pageSize = 50) {
+  const list = providerLists.find((candidate) => candidate.key === providerKey);
+  if (!list) {
+    return null;
+  }
+
+  const safePageSize = Math.min(Math.max(pageSize, 1), 100);
+  const totalPages = Math.max(1, Math.ceil(list.items.length / safePageSize));
+  const currentPage = Math.min(Math.max(page, 1), totalPages);
+  const start = (currentPage - 1) * safePageSize;
+  const pageItems = getListProblems(list).slice(start, start + safePageSize);
+  const users = data.users.filter((user) => user.active).map((user) => ({
+    id: user.id,
+    displayName: user.displayName,
+    githubUsername: user.githubUsername,
+  }));
+  const communitySolutionCounts = getCommunitySolutionCounts();
+  const submissionsByUser = new Map(
+    data.users.map((user) => [user.id, new Map(user.submissions.map((submission) => [submission.problemKey, submission]))]),
+  );
+
+  const items = pageItems.map((item) => ({
+    ...item,
+    submissions: Object.fromEntries(
+      users.map((user) => [user.id, submissionsByUser.get(user.id)?.get(item.problemKey) ?? null]),
+    ),
+    communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
+  }));
+
+  return {
+    list,
+    users,
+    items,
+    pagination: { currentPage, totalPages, pageSize: safePageSize, totalItems: list.items.length },
   };
 }
 
