@@ -7,6 +7,7 @@ import {
   normalizeRanges,
   splitLines,
   targetLine,
+  tokenizeCodeLine,
   type SolutionCodeViewerProps,
 } from "@/app/components/solution-code-viewer-helpers";
 import styles from "./solution-code-viewer.module.css";
@@ -48,8 +49,11 @@ function surfaceClass(className?: string) {
 
 export function SolutionCodeViewer({
   state,
+  language,
   permalink,
   className,
+  activeLineRef,
+  onLineHover,
 }: SolutionCodeViewerProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -167,6 +171,9 @@ export function SolutionCodeViewer({
         ? normalizeRanges(state.lineRefs, lines.length)
         : [];
       const highlights = highlightSet(refs, lines.length);
+      const activeHighlights = activeLineRef
+        ? highlightSet([activeLineRef], lines.length)
+        : new Set<number>();
       const focusLine = targetLine(refs);
 
       return (
@@ -178,10 +185,12 @@ export function SolutionCodeViewer({
                 const lineNumber = index + 1;
                 const isHighlight = highlights.has(lineNumber);
                 const isTarget = focusLine === lineNumber;
+                const isActive = activeHighlights.has(lineNumber);
                 const rowClasses = [
                   styles.lineRow,
                   isHighlight && !isTarget ? styles.highlight : "",
                   isTarget ? styles.target : "",
+                  isActive ? styles.activeReview : "",
                 ]
                   .filter(Boolean)
                   .join(" ");
@@ -191,8 +200,18 @@ export function SolutionCodeViewer({
                     key={lineNumber}
                     id={`solution-line-${lineNumber}`}
                     data-line={lineNumber}
+                    data-review-active={isActive ? "true" : undefined}
                     className={rowClasses}
                     role="row"
+                    onMouseEnter={() => onLineHover?.(lineNumber)}
+                    onMouseLeave={(event) => {
+                      if (document.activeElement !== event.currentTarget) {
+                        onLineHover?.(null);
+                      }
+                    }}
+                    onFocus={() => onLineHover?.(lineNumber)}
+                    onBlur={() => onLineHover?.(null)}
+                    tabIndex={onLineHover ? 0 : undefined}
                   >
                     <span
                       className={styles.lineNumber}
@@ -202,7 +221,11 @@ export function SolutionCodeViewer({
                       {lineNumber}
                     </span>
                     <span className={styles.lineContent} role="cell">
-                      {content}
+                      {tokenizeCodeLine(content, language ?? "").map((token, tokenIndex) => (
+                        <span key={`${lineNumber}-${tokenIndex}`} className={styles[`token-${token.kind}`]}>
+                          {token.text}
+                        </span>
+                      ))}
                     </span>
                   </div>
                 );

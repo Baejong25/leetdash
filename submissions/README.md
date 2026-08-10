@@ -21,6 +21,7 @@ submissions/
 | Top Interview Questions Easy | `top-interview-easy` | 문제 고유 LeetCode 번호 |
 | LeetCode 75 | `leetcode-75` | 문제 제목 앞 LeetCode 번호 |
 | Top Interview 150 | `top-interview-150` | 문제 제목 앞 LeetCode 번호 |
+| LeetCode | `leetcode` | 문제 고유 LeetCode 번호 |
 | Programmers | `programmers` | 프로그래머스 문제 번호 |
 | 프로그래머스 고득점 Kit | `programmers-high-score-kit` | 프로그래머스 문제 번호 |
 | SWEA | `swea` | SWEA 문제 번호 |
@@ -31,6 +32,7 @@ submissions/
 submissions/ada/top-interview-easy/66/solution.ts
 submissions/ada/leetcode-75/1768/solution.ts
 submissions/ada/top-interview-150/88/solution.py
+submissions/ada/leetcode/1/solution.ts
 submissions/ada/programmers/12906/solution.java
 submissions/ada/programmers-high-score-kit/42576/solution.java
 submissions/ada/swea/1206/solution.py

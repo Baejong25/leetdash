@@ -107,7 +107,10 @@ export default async function HomePage() {
               <div className="home-feed-content">
                 <p>
                   <Link href={`/users/${submission.userId}`} className="feed-user">{submission.displayName}</Link>님이
-                  <span className="feed-action"> {submission.problemTitle}</span>을 해결했습니다.
+                  <Link
+                    className="feed-action problem-link"
+                    href={`/problems/${encodeURIComponent(submission.problemProvider)}/${encodeURIComponent(submission.problemId)}?user=${encodeURIComponent(submission.userId)}`}
+                  > {submission.problemTitle}</Link>을 해결했습니다.
                 </p>
                 <span className="feed-meta">
                   {formatCatalogListTitle(submission.listTitle)} · {formatSnapshotDateTime(submission.submittedAt)}

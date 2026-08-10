@@ -38,8 +38,15 @@ type ListData = {
   };
 };
 
+type ProviderData = {
+  key: string;
+  title: string;
+  progress: ListData["progress"];
+};
+
 type Props = {
   lists: ListData[];
+  providerLists?: ProviderData[];
   firstUnsolvedProblemTarget: {
     elementId: string;
     listKey: string;
@@ -93,7 +100,7 @@ function getListProvider(items: ListItem[]): CatalogProvider {
   return items[0]?.problem?.provider ?? "leetcode";
 }
 
-export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, profileUserId }: Props) {
+export function FilterableUserProblemLists({ lists, providerLists = [], firstUnsolvedProblemTarget, profileUserId }: Props) {
   const [difficultyFilters, setDifficultyFilters] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -144,7 +151,7 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
         ) : null}
       </div>
 
-      {lists.map((list) => {
+      {lists.map((list, index) => {
         const provider = getListProvider(list.items);
         const difficultyOptions = difficultyOptionsByProvider[provider];
         const listDifficulty = difficultyFilters[list.key] ?? "all";
@@ -155,8 +162,15 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
             : "";
 
         return (
+          <div key={list.key}>
+          {index === lists.length && providerLists.length > 0 ? (
+            <div className="section-heading provider-section-heading">
+              <p className="eyebrow">PROVIDERS</p>
+              <h2>제공자별 전체 문제</h2>
+              <p className="section-description">Programmers와 SWEA 전체 문제는 카탈로그 진행률과 분리해 표시합니다.</p>
+            </div>
+          ) : null}
           <CatalogProblemList
-            key={list.key}
             title={formatCatalogListTitle(list.title)}
             subtitle={`풀이 완료 ${list.progress.solved}개, 검토 중 ${list.progress.reviewing}개, 건너뜀 ${list.progress.skipped}개${subtitleSuffix}`}
           >
@@ -212,7 +226,7 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
                           id={isFirstUnsolvedProblem ? firstUnsolvedProblemTarget.elementId : undefined}
                           key={`${list.key}-${item.problemKey}`}
                         >
-                          <td className="mono">{item.order}</td>
+                          <td className="mono">{item.problem.problemId}</td>
                           <td>
                             {comparisonHref ? (
                               <Link className="problem-link" href={comparisonHref}>
@@ -256,8 +270,32 @@ export function FilterableUserProblemLists({ lists, firstUnsolvedProblemTarget, 
               </div>
             )}
           </CatalogProblemList>
+          </div>
         );
       })}
+      {providerLists.length > 0 ? (
+        <>
+          <div className="section-heading provider-section-heading">
+            <p className="eyebrow">PROVIDERS</p>
+            <h2>Provider 전체 문제</h2>
+            <p className="section-description">전체 문제는 별도 페이지에서 페이지네이션으로 표시합니다.</p>
+          </div>
+          <div className="list-grid">
+            {providerLists.map((provider) => (
+              <Link className="list-card" href={`/providers/${provider.key}/1`} key={provider.key}>
+                <h3>{formatCatalogListTitle(provider.title)}</h3>
+                <div className="progress-meta">
+                  <span className="muted">{provider.progress.solved}/{provider.progress.total} solved</span>
+                  <strong>{Math.round(provider.progress.percent)}%</strong>
+                </div>
+                <div className="bar">
+                  <div className="bar-fill" style={{ width: `${Math.min(provider.progress.percent, 100)}%` }} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : null}
     </>
   );
 }

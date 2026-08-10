@@ -16,6 +16,7 @@ describe("problem catalog", () => {
       ["programmers", 689],
       ["swea", 1124],
       ["programmers-high-score-kit", 47],
+      ["leetcode", 4017],
     ]);
   });
 
@@ -73,6 +74,15 @@ describe("problem catalog", () => {
 
     expect(leetcode75?.items.find((item) => item.problemKey === "leetcode:1768")?.submissionKey).toBe("1768");
     expect(topInterview150?.items.find((item) => item.problemKey === "leetcode:88")?.submissionKey).toBe("88");
+  });
+
+  it("includes the complete LeetCode provider catalog", () => {
+    const leetcode = catalog.lists.find((list) => list.key === "leetcode");
+    expect(leetcode).toBeDefined();
+    expect(leetcode?.items.length).toBeGreaterThan(3000);
+    expect(leetcode?.items.length).toBe(leetcode?.problems.length);
+    expect(leetcode?.items[0]?.submissionKey).toBe("1");
+    expect(leetcode?.items.every((item) => item.problemKey.startsWith("leetcode:"))).toBe(true);
   });
 
   it("includes the initial Programmers and SWEA problems", () => {

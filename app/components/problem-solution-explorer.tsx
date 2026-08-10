@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  findReviewIndexForLine,
   type SolutionCodeViewerState,
 } from "@/app/components/solution-code-viewer-helpers";
 import {
@@ -15,6 +16,7 @@ import { statusLabel } from "@/lib/format";
 import type { ProblemSolutionDetail } from "@/lib/problem-solutions";
 import { loadRawSource, type RawLoadResult } from "@/lib/raw-source-loader";
 import { isAbortError, type LineReference } from "@/lib/solution-assets";
+import type { ReviewItem } from "@/lib/solution-assets";
 import { useClientQuery } from "@/app/components/use-client-query";
 import styles from "./problem-solution-explorer.module.css";
 
@@ -69,6 +71,8 @@ export function ProblemSolutionExplorer({
   const [reviewLineRefs, setReviewLineRefs] = useState<
     readonly LineReference[] | undefined
   >(undefined);
+  const [reviewItems, setReviewItems] = useState<readonly ReviewItem[]>([]);
+  const [activeReviewIndex, setActiveReviewIndex] = useState<number | null>(null);
   const fetchIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const userInitiatedRef = useRef(false);
@@ -94,6 +98,8 @@ export function ProblemSolutionExplorer({
         setViewerState({ status: "loading" });
       }
       setReviewLineRefs(undefined);
+      setReviewItems([]);
+      setActiveReviewIndex(null);
       return;
     }
 
@@ -111,6 +117,8 @@ export function ProblemSolutionExplorer({
     abortRef.current = controller;
     setViewerState({ status: "loading" });
     setReviewLineRefs(undefined);
+    setReviewItems([]);
+    setActiveReviewIndex(null);
 
     loadRawSource({
       url: rawUrl,
@@ -159,6 +167,22 @@ export function ProblemSolutionExplorer({
     },
     [],
   );
+
+  const handleCodeLineHover = useCallback(
+    (line: number | null) => {
+      setActiveReviewIndex(line === null ? null : findReviewIndexForLine(reviewItems, line));
+    },
+    [reviewItems],
+  );
+
+  const handleReviewsChange = useCallback((reviews: readonly ReviewItem[]) => {
+    setReviewItems(reviews);
+    setActiveReviewIndex(null);
+  }, []);
+
+  const activeReviewRef = activeReviewIndex === null
+    ? null
+    : reviewItems[activeReviewIndex]?.lineReference ?? null;
 
   // ── Derived ──
   const selectedUserId =
@@ -259,7 +283,10 @@ export function ProblemSolutionExplorer({
               <div className={styles.codeColumn}>
                 <SolutionCodeViewer
                   state={displayViewerState}
+                  language={selectedSolver.submission.language}
                   permalink={selectedSolver.submission.solutionPermalink ?? null}
+                  activeLineRef={activeReviewRef}
+                  onLineHover={handleCodeLineHover}
                 />
               </div>
               <div className={styles.reviewColumn}>
@@ -267,6 +294,9 @@ export function ProblemSolutionExplorer({
                   pathKey={selectedSolver.submission.solutionPathKey ?? null}
                   contentKey={selectedSolver.submission.solutionContentKey ?? null}
                   onFocusLine={handleReviewFocus}
+                  activeReviewIndex={activeReviewIndex}
+                  onReviewHover={setActiveReviewIndex}
+                  onReviewsChange={handleReviewsChange}
                 />
               </div>
             </div>

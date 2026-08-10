@@ -27,6 +27,7 @@ AI 리뷰 API는 `deepseek-v4-flash` 모델을 OpenCode Go 게이트웨이(`http
 | Top Interview Questions Easy | `top-interview-easy` | 문제 고유 LeetCode 번호 | `submissions/<githubUsername>/top-interview-easy/66/solution.ts` |
 | LeetCode 75 | `leetcode-75` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/leetcode-75/1768/solution.ts` |
 | Top Interview 150 | `top-interview-150` | 문제 제목 앞 LeetCode 번호 | `submissions/<githubUsername>/top-interview-150/88/solution.ts` |
+| LeetCode | `leetcode` | 문제 고유 LeetCode 번호 | `submissions/<githubUsername>/leetcode/1/solution.ts` |
 | Programmers | `programmers` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers/12906/solution.java` |
 | 프로그래머스 고득점 Kit | `programmers-high-score-kit` | 프로그래머스 문제 번호 | `submissions/<githubUsername>/programmers-high-score-kit/42576/solution.java` |
 | SWEA | `swea` | SWEA 문제 번호 | `submissions/<githubUsername>/swea/1206/solution.py` |
@@ -102,6 +103,9 @@ submissions/
     top-interview-150/
       88/
         solution.py
+    leetcode/
+      1/
+        solution.ts
     programmers/
       12906/
         solution.java
@@ -151,6 +155,7 @@ c, cc, cpp, cs, dart, go, java, js, kt, php, py, rb, rs, scala, sql, swift, ts
 - Top Interview Questions Easy
 - LeetCode 75
 - Top Interview 150
+- LeetCode
 - Programmers
 - 프로그래머스 고득점 Kit
 - SWEA
@@ -179,6 +184,12 @@ npm run dev
 ```bash
 npm run progress:build
 ```
+
+## 미풀이 사용자 알림
+
+`.github/workflows/inactive-reminders.yml`은 매일 오전 9시(Asia/Seoul)에 실행되어 고정 GitHub Issue에 미풀이 사용자를 멘션합니다. 알림 대상은 `data/users.json`에 `active: true`가 명시되어 있고 풀이 이력이 있는 사용자입니다. 마지막 풀이 후 3일째, 7일째, 이후 7일마다 알립니다.
+
+운영자는 알림용 Issue를 하나 만든 뒤 저장소의 `Settings > Secrets and variables > Actions > Variables`에서 `REMINDER_ISSUE_NUMBER`를 해당 Issue 번호로 등록합니다. 같은 날짜의 workflow를 재실행해도 관리 마커를 확인하여 댓글을 중복 작성하지 않습니다. 수동 검증은 Actions의 `Inactive User Reminders` workflow에서 `Run workflow`로 실행합니다.
 
 `npm run build`는 항상 `next build` 전에 진행 데이터 생성기를 실행합니다.
 
@@ -266,7 +277,7 @@ gh run list --workflow sweep-submission-prs.yml --repo whoisyourbias/leetdash --
 
 ### 리뷰 생애주기
 
-리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 분할 리뷰 JSON에는 살균된 일반 텍스트 리뷰(`text`)와 줄 참조(`lineReferences`)가 들어 있습니다. `text`는 HTML이나 Markdown이 아니라 React 텍스트 노드로만 렌더링됩니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
+리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 분할 리뷰 JSON에는 살균된 일반 텍스트 리뷰(`text`), 줄 참조(`lineReferences`), 각 단일 줄·범위 리뷰를 해당 줄 참조와 묶은 항목(`reviews`)이 들어 있습니다. 리뷰 텍스트는 HTML이나 Markdown이 아니라 React 텍스트 노드로만 렌더링됩니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
 
 `index.json`의 상태:
 

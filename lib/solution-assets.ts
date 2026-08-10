@@ -24,6 +24,12 @@ export type LineReference = {
   end: number;
 };
 
+export type ReviewItem = {
+  /** One producer-formatted inline review, safe for React text nodes only. */
+  text: string;
+  lineReference: LineReference;
+};
+
 export type ReviewArtifact = {
   pathKey: Hex64;
   contentKey: Hex64;
@@ -32,6 +38,7 @@ export type ReviewArtifact = {
   /** Plain text for React text nodes only; null = explicit "리뷰 코멘트 없음." */
   text: string | null;
   lineReferences: LineReference[];
+  reviews: ReviewItem[];
 };
 
 export type ReviewLoadResult =
@@ -161,7 +168,37 @@ export function parseReviewArtifactJson(value: unknown): ReviewArtifact | null {
     }
     lineReferences.push({ start, end });
   }
-  if (record.text === null && lineReferences.length > 0) {
+  if (!Array.isArray(record.reviews)) {
+    return null;
+  }
+  const reviews: ReviewItem[] = [];
+  for (const review of record.reviews) {
+    if (typeof review !== "object" || review === null) {
+      return null;
+    }
+    const item = review as Record<string, unknown>;
+    if (typeof item.text !== "string" || item.text.length === 0) {
+      return null;
+    }
+    if (typeof item.lineReference !== "object" || item.lineReference === null) {
+      return null;
+    }
+    const reference = item.lineReference as Record<string, unknown>;
+    const start = reference.start;
+    const end = reference.end;
+    if (
+      typeof start !== "number" ||
+      typeof end !== "number" ||
+      !Number.isSafeInteger(start) ||
+      !Number.isSafeInteger(end) ||
+      start < 1 ||
+      end < start
+    ) {
+      return null;
+    }
+    reviews.push({ text: item.text, lineReference: { start, end } });
+  }
+  if (record.text === null && (lineReferences.length > 0 || reviews.length > 0)) {
     return null;
   }
   return {
@@ -171,6 +208,7 @@ export function parseReviewArtifactJson(value: unknown): ReviewArtifact | null {
     updatedAt: record.updatedAt,
     text: record.text,
     lineReferences,
+    reviews,
   };
 }
 
