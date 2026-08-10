@@ -395,6 +395,32 @@ export async function getUserDetail(userId: string) {
   };
 }
 
+function getProviderProblemUsers() {
+  return data.users.filter((user) => user.active).map((user) => ({
+    id: user.id,
+    displayName: user.displayName,
+    githubUsername: user.githubUsername,
+  }));
+}
+
+function buildProviderProblemItems(
+  problemItems: ReturnType<typeof getListProblems>,
+  users: ReturnType<typeof getProviderProblemUsers>,
+) {
+  const communitySolutionCounts = getCommunitySolutionCounts();
+  const submissionsByUser = new Map(
+    data.users.map((user) => [user.id, new Map(user.submissions.map((submission) => [submission.problemKey, submission]))]),
+  );
+
+  return problemItems.map((item) => ({
+    ...item,
+    submissions: Object.fromEntries(
+      users.map((user) => [user.id, submissionsByUser.get(user.id)?.get(item.problemKey) ?? null]),
+    ),
+    communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
+  }));
+}
+
 export async function getProviderProblemDetail(providerKey: string, page = 1, pageSize = 50) {
   const list = providerLists.find((candidate) => candidate.key === providerKey);
   if (!list) {
@@ -406,23 +432,8 @@ export async function getProviderProblemDetail(providerKey: string, page = 1, pa
   const currentPage = Math.min(Math.max(page, 1), totalPages);
   const start = (currentPage - 1) * safePageSize;
   const pageItems = getListProblems(list).slice(start, start + safePageSize);
-  const users = data.users.filter((user) => user.active).map((user) => ({
-    id: user.id,
-    displayName: user.displayName,
-    githubUsername: user.githubUsername,
-  }));
-  const communitySolutionCounts = getCommunitySolutionCounts();
-  const submissionsByUser = new Map(
-    data.users.map((user) => [user.id, new Map(user.submissions.map((submission) => [submission.problemKey, submission]))]),
-  );
-
-  const items = pageItems.map((item) => ({
-    ...item,
-    submissions: Object.fromEntries(
-      users.map((user) => [user.id, submissionsByUser.get(user.id)?.get(item.problemKey) ?? null]),
-    ),
-    communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
-  }));
+  const users = getProviderProblemUsers();
+  const items = buildProviderProblemItems(pageItems, users);
 
   return {
     list,
@@ -430,6 +441,18 @@ export async function getProviderProblemDetail(providerKey: string, page = 1, pa
     items,
     pagination: { currentPage, totalPages, pageSize: safePageSize, totalItems: list.items.length },
   };
+}
+
+export async function getProviderProblemIndex(providerKey: string) {
+  const list = providerLists.find((candidate) => candidate.key === providerKey);
+  if (!list) {
+    return null;
+  }
+
+  const users = getProviderProblemUsers();
+  const items = buildProviderProblemItems(getListProblems(list), users);
+
+  return { items };
 }
 
 export async function getListDetail(listKey: string) {
