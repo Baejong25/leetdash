@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getStoredOnboardingVersion, saveOnboardingVersion } from "@/lib/onboarding";
 
@@ -115,15 +116,21 @@ export function HomeOnboarding({ slides }: HomeOnboardingProps) {
               <p className="eyebrow">처음 방문하셨나요?</p>
               <h2 id="home-onboarding-title">{slide.title}</h2>
               <p id="home-onboarding-description">{slide.description}</p>
-              <a
-                className="button primary"
-                href={slide.href}
-                target={isExternalLink ? "_blank" : undefined}
-                rel={isExternalLink ? "noreferrer" : undefined}
-                onClick={dismiss}
-              >
-                {slide.cta}
-              </a>
+              {isExternalLink ? (
+                <a
+                  className="button primary"
+                  href={slide.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={dismiss}
+                >
+                  {slide.cta}
+                </a>
+              ) : (
+                <Link className="button primary" href={slide.href} onClick={dismiss}>
+                  {slide.cta}
+                </Link>
+              )}
             </div>
 
             <div className="home-onboarding-actions">

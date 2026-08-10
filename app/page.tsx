@@ -16,7 +16,7 @@ export default async function HomePage() {
     {
       title: "참여자 등록",
       description: "GitHub 아이디를 운영자에게 전달해 참여자로 등록하세요. 등록 후 풀이 기록이 대시보드에 표시됩니다.",
-      href: "/admin",
+      href: "https://github.com/whoisyourbias/leetdash#참여자-등록",
       cta: "등록 안내 보기",
     },
     {
