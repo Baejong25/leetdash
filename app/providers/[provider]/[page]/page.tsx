@@ -31,7 +31,6 @@ export default async function ProviderProblemsPage({
   }
 
   const { list, items, users, pagination } = detail;
-  const pageHref = (pageNumber: number) => `/providers/${list.key}/${pageNumber}`;
 
   return (
     <div className="page">
@@ -44,17 +43,18 @@ export default async function ProviderProblemsPage({
         <Link className="button" href="/">대시보드로 돌아가기</Link>
       </div>
 
-      <CatalogProblemBrowser items={items} users={users} />
-
-      <nav className="history-pagination" aria-label="Provider 문제 페이지">
-        {pagination.currentPage > 1 ? (
-          <Link className="button" href={pageHref(pagination.currentPage - 1)}>이전</Link>
-        ) : null}
-        <span className="muted">{pagination.currentPage} / {pagination.totalPages}</span>
-        {pagination.currentPage < pagination.totalPages ? (
-          <Link className="button" href={pageHref(pagination.currentPage + 1)}>다음</Link>
-        ) : null}
-      </nav>
+      <CatalogProblemBrowser
+        key={`${list.key}:${pagination.currentPage}`}
+        items={items}
+        users={users}
+        providerPagination={{
+          provider: items[0]?.problem.provider ?? "leetcode",
+          currentPage: pagination.currentPage,
+          totalPages: pagination.totalPages,
+          pageSize: pagination.pageSize,
+          totalItems: pagination.totalItems,
+        }}
+      />
     </div>
   );
 }

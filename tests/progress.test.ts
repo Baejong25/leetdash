@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildRecentSolvedSubmissions, getCommunitySolutionCounts, getDashboardData, getUserDetail } from "@/lib/progress";
+import {
+  buildRecentSolvedSubmissions,
+  getCommunitySolutionCounts,
+  getDashboardData,
+  getProviderProblemIndex,
+  getUserDetail,
+} from "@/lib/progress";
 import { SubmissionStatus, type ProgressData, type ProgressUser, type Submission } from "@/lib/types";
 
 function submission(overrides: Partial<Submission>): Submission {
@@ -105,6 +111,13 @@ describe("dashboard progress helpers", () => {
       listKey: expected?.listKey,
       problemKey: expected?.problemKey,
     });
+  });
+
+  it("builds a complete filter index for every provider", async () => {
+    await expect(getProviderProblemIndex("leetcode")).resolves.toMatchObject({ items: { length: 4017 } });
+    await expect(getProviderProblemIndex("programmers")).resolves.toMatchObject({ items: { length: 689 } });
+    await expect(getProviderProblemIndex("swea")).resolves.toMatchObject({ items: { length: 1124 } });
+    await expect(getProviderProblemIndex("unknown")).resolves.toBeNull();
   });
 
   it("returns the five most recent solved submissions with user and problem labels", () => {
