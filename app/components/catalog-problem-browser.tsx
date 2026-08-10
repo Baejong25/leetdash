@@ -120,7 +120,7 @@ export function CatalogProblemBrowser({ items, users }: { items: Item[]; users: 
               const submission = selectedUserId ? item.submissions[selectedUserId] : null;
               const comparisonHref = selectedUserId ? getComparisonLinkHref(item.problem.provider, item.problem.problemId, selectedUserId, item.communitySolutionCount) : null;
               return <tr key={item.problemKey}>
-                <td className="mono">{item.order}</td>
+                <td className="mono">{item.problem.problemId}</td>
                 <td><div className="problem-title">{comparisonHref ? <Link className="problem-link" href={comparisonHref}>{formatProblemTitle(item.problem.title)}</Link> : formatProblemTitle(item.problem.title)}</div><div className="muted mono">{formatCatalogSection(item.section)}</div></td>
                 <td><span className="badge neutral">{difficultyLabel(item.problem.difficulty)}</span></td>
                 <td>{submission ? <><span className={`badge ${submission.status.toLowerCase()}`}>{statusLabel(submission.status)}</span>{submission.notes ? <div className="muted">{submission.notes}</div> : null}</> : <span className="badge neutral">시작 전</span>}</td>
