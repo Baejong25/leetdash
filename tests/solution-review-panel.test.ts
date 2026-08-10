@@ -1,5 +1,6 @@
 import { describe, afterEach, expect, it, vi } from "vitest";
 import { mapReviewToView, lineLabel, type ReviewPanelView } from "@/app/components/solution-review-panel";
+import { findReviewIndexForLine } from "@/app/components/solution-code-viewer-helpers";
 import { loadReview, assertHex64, type ReviewLoadResult, type ReviewArtifact, type Hex64, isAbortError } from "@/lib/solution-assets";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -19,12 +20,16 @@ const artifact: ReviewArtifact = {
   updatedAt: "2026-08-08T00:00:00.000Z",
   text: "good approach",
   lineReferences: [{ start: 15, end: 15 }],
+  reviews: [
+    { text: "L15 good approach", lineReference: { start: 15, end: 15 } },
+  ],
 };
 
 const noCommentArtifact: ReviewArtifact = {
   ...artifact,
   text: null,
   lineReferences: [],
+  reviews: [],
 };
 
 const completeIndex = {
@@ -189,6 +194,28 @@ describe("lineLabel", () => {
   it("handles line 1 correctly", () => {
     expect(lineLabel({ start: 1, end: 1 })).toBe("코드 L1로 이동");
     expect(lineLabel({ start: 1, end: 5 })).toBe("코드 L1–L5으로 이동");
+  });
+});
+
+describe("findReviewIndexForLine", () => {
+  const reviews = [
+    { text: "range", lineReference: { start: 10, end: 20 } },
+    { text: "single", lineReference: { start: 15, end: 15 } },
+    { text: "other range", lineReference: { start: 30, end: 32 } },
+  ];
+
+  it("maps every line in a range to the same review", () => {
+    expect(findReviewIndexForLine(reviews, 10)).toBe(0);
+    expect(findReviewIndexForLine(reviews, 18)).toBe(0);
+    expect(findReviewIndexForLine(reviews, 20)).toBe(0);
+  });
+
+  it("prefers a single-line review over an overlapping range", () => {
+    expect(findReviewIndexForLine(reviews, 15)).toBe(1);
+  });
+
+  it("returns null outside reviewed lines", () => {
+    expect(findReviewIndexForLine(reviews, 29)).toBeNull();
   });
 });
 

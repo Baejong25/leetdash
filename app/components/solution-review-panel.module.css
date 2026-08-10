@@ -19,20 +19,27 @@
   color: var(--text);
   font-size: 15px;
   line-height: 1.55;
-  margin: 0 0 12px 0;
+  margin: 0 0 10px 0;
   white-space: pre-wrap;
 }
 
+.reviewList {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .reviewBlock {
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
-  margin: -12px;
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .reviewBlockActive {
   composes: reviewBlock;
   background: color-mix(in srgb, var(--accent-soft) 72%, var(--surface));
+  border-color: var(--accent);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
@@ -41,14 +48,6 @@
   font-size: 15px;
   line-height: 1.55;
   margin: 0 0 12px 0;
-}
-
-.lineButtons {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
 }
 
 .lineButton {

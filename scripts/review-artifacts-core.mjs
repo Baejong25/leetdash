@@ -11,8 +11,8 @@
 //     { id, user: { login }, html_url, updated_at, body }.
 //   - Only comments from the exact login `github-actions[bot]` with a managed
 //     kind=file marker pair (path + content SHA-256 markers) are accepted.
-//   - Artifacts are emitted ONLY with the six safe fields:
-//     { pathKey, contentKey, commentUrl, updatedAt, text, lineReferences }.
+//   - Artifacts are emitted ONLY with the seven safe fields:
+//     { pathKey, contentKey, commentUrl, updatedAt, text, lineReferences, reviews }.
 //   - `text` is the producer's display text with exactly one layer of the
 //     producer's known entity escaping decoded (so `<`, `>`, `&`, `@`, and URL
 //     punctuation are readable and no double entities remain), with trusted
@@ -20,10 +20,12 @@
 //     remaining remote URL stripped. It is safe ONLY as a React text node
 //     (React escapes angle brackets); never render it as HTML/Markdown.
 //     `text === null` is the explicit no-comment representation
-//     (`리뷰 코멘트 없음.`); `lineReferences` is then empty.
-//   - `lineReferences` are numeric GitHub source anchors extracted ONLY from
-//     the restored line labels (`L<num>` / `L<start>-L<end>`); markdown/HTML
-//     links in the body are never emitted as anchors or links.
+//     (`리뷰 코멘트 없음.`); `lineReferences` and `reviews` are then empty.
+//   - `reviews` preserve each producer-formatted inline comment as a separate
+//     `{ text, lineReference }` item. A review starts with a source anchor at
+//     the beginning of a line (`L<num>` / `L<start>-L<end>`). Anchors inside
+//     fenced code or prose are never treated as review boundaries.
+//   - `lineReferences` is the sorted, deduplicated projection of `reviews`.
 //   - `parseReviewArtifacts` maps comments against current solution metadata
 //     and selects the newest comment by `updated_at`, then the highest safe
 //     numeric comment id for deterministic ties.
@@ -37,7 +39,6 @@ const contentMarkerPattern = /^<!-- leetdash-opencode-review-content:([a-f0-9]{6
 const mascotImagePattern = /^<img\b/;
 const brandedHeadingPattern = /^##\s+/;
 const metadataLinePattern = /^(?:파일|커밋|워크플로):\s*/;
-const lineAnchorPattern = /L(\d{1,6})-L(\d{1,6})|L(\d{1,6})\b/g;
 const maxLineReferences = 100;
 const noCommentText = "리뷰 코멘트 없음.";
 
@@ -109,15 +110,40 @@ function stripManagedPrefix(body) {
   return lines.slice(index).join("\n");
 }
 
-function extractLineReferences(text) {
-  const refs = [];
-  for (const match of text.matchAll(lineAnchorPattern)) {
-    const [, rangeStart, rangeEnd, single] = match;
-    const start = rangeStart !== undefined ? Number(rangeStart) : Number(single);
-    const end = rangeStart !== undefined ? Number(rangeEnd) : start;
-    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start) continue;
-    refs.push({ start, end });
+function extractReviews(text) {
+  const lines = text.split("\n");
+  const starts = [];
+  let inFence = false;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!inFence) {
+      const match = /^L(\d{1,6})(?:-L(\d{1,6}))?(?=\s|:)/.exec(line);
+      if (match) {
+        const start = Number(match[1]);
+        const end = match[2] === undefined ? start : Number(match[2]);
+        if (Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 1 && end >= start) {
+          starts.push({ index, lineReference: { start, end } });
+          if (starts.length >= maxLineReferences) break;
+        }
+      }
+    }
+
+    const fenceCount = line.match(/```/g)?.length ?? 0;
+    if (fenceCount % 2 === 1) inFence = !inFence;
   }
+
+  return starts.map((entry, index) => {
+    const next = starts[index + 1];
+    return {
+      text: lines.slice(entry.index, next?.index ?? lines.length).join("\n").trim(),
+      lineReference: entry.lineReference,
+    };
+  });
+}
+
+function extractLineReferences(reviews) {
+  const refs = reviews.map((review) => review.lineReference);
   refs.sort((a, b) => a.start - b.start || a.end - b.end);
   const deduped = [];
   const seen = new Set();
@@ -169,9 +195,12 @@ export function parseReviewArtifact(comment) {
       updatedAt,
       text: null,
       lineReferences: [],
+      reviews: [],
     };
   }
   if (text.length === 0) return null;
+
+  const reviews = extractReviews(text);
 
   return {
     pathKey: marker.key,
@@ -179,7 +208,8 @@ export function parseReviewArtifact(comment) {
     commentUrl: comment.html_url,
     updatedAt,
     text,
-    lineReferences: extractLineReferences(text),
+    lineReferences: extractLineReferences(reviews),
+    reviews,
   };
 }
 

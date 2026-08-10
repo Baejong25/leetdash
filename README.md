@@ -277,7 +277,7 @@ gh run list --workflow sweep-submission-prs.yml --repo whoisyourbias/leetdash --
 
 ### 리뷰 생애주기
 
-리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 분할 리뷰 JSON에는 살균된 일반 텍스트 리뷰(`text`)와 줄 참조(`lineReferences`)가 들어 있습니다. `text`는 HTML이나 Markdown이 아니라 React 텍스트 노드로만 렌더링됩니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
+리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 분할 리뷰 JSON에는 살균된 일반 텍스트 리뷰(`text`), 줄 참조(`lineReferences`), 각 단일 줄·범위 리뷰를 해당 줄 참조와 묶은 항목(`reviews`)이 들어 있습니다. 리뷰 텍스트는 HTML이나 Markdown이 아니라 React 텍스트 노드로만 렌더링됩니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
 
 `index.json`의 상태:
 

@@ -138,6 +138,11 @@
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.activeReview {
+  background: color-mix(in srgb, var(--accent-soft) 82%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .target:focus {
   outline: none;
 }

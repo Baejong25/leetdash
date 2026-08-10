@@ -195,6 +195,16 @@ describe("sync-review-artifacts: pagination and request contract", () => {
         { start: 15, end: 15 },
         { start: 19, end: 19 },
       ],
+      reviews: [
+        {
+          text: reviewProse.split("\n")[0],
+          lineReference: { start: 15, end: 15 },
+        },
+        {
+          text: reviewProse.split("\n")[1],
+          lineReference: { start: 19, end: 19 },
+        },
+      ],
     });
 
     const index = await readJson(path.join(outputDir, "index.json"));
