@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, GitFork, UserRoundCheck, Users } from "lucide-react";
+import { BarChart3, GitFork, House, UserRoundCheck, Users } from "lucide-react";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "LeetCode 진행 레이더",
   description: "GitHub 저장소 기반 LeetCode 스터디 진행 현황 대시보드",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -19,8 +22,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </Link>
           <nav className="top-nav" aria-label="주요 내비게이션">
             <Link href="/">
+              <House size={16} aria-hidden="true" />
+              홈
+            </Link>
+            <Link href="/statistics">
               <BarChart3 size={16} aria-hidden="true" />
-              대시보드
+              통계
             </Link>
             <Link href="/admin">
               <Users size={16} aria-hidden="true" />

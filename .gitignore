@@ -11,3 +11,49 @@ coverage
 .data
 **/.DS_Store
 **/.idea/
+
+# =========================
+# IntelliJ IDEA / Android Studio
+# =========================
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# =========================
+# Eclipse
+# =========================
+.project
+.classpath
+.settings/
+.metadata/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+.history/
+
+# =========================
+# NetBeans
+# =========================
+nbproject/private/
+build/
+dist/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# =========================
+# STS (Spring Tool Suite)
+# =========================
+.springBeans
+.sts4-cache/
+
+# =========================
+# Generic
+# =========================
+*.swp
+*.swo
+*~

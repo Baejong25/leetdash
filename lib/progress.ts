@@ -2,6 +2,7 @@ import { buildActivityCalendar, getSeoulDateKey, type ActivityCalendarWindow } f
 import { catalog, getList, getListProblems, getProblem, type CatalogList } from "@/lib/catalog";
 import progressData from "@/data/progress.json";
 import { FIRST_UNSOLVED_PROBLEM_ELEMENT_ID } from "@/lib/user-problem-focus";
+import { getSelectedSubmission } from "@/lib/submission-selection";
 import {
   SubmissionStatus,
   type ActivityDay,
@@ -209,6 +210,22 @@ function buildUserRow(
 
 const data = progressData as ProgressData;
 
+export function getCommunitySolutionCounts(
+  input: ProgressData = data,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const user of input.users) {
+    const problemKeys = new Set(user.submissions.map((submission) => submission.problemKey));
+    for (const problemKey of problemKeys) {
+      const selected = getSelectedSubmission(user, problemKey);
+      if (selected?.solutionPath) {
+        counts.set(problemKey, (counts.get(problemKey) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
 export async function listStaticUsers() {
   return data.users;
 }
@@ -277,6 +294,7 @@ export async function getUserDetail(userId: string) {
     return null;
   }
 
+  const communitySolutionCounts = getCommunitySolutionCounts();
   const submissions = new Map(user.submissions.map((submission) => [submission.problemKey, submission]));
   const lists = catalog.lists
     .map((list) => ({
@@ -285,6 +303,7 @@ export async function getUserDetail(userId: string) {
       items: getListProblems(list).map((item) => ({
         ...item,
         submission: submissions.get(item.problemKey) ?? null,
+        communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
       })),
     }))
     .sort((a, b) => b.progress.solved - a.progress.solved);
@@ -338,4 +357,31 @@ export async function getListDetail(listKey: string) {
   );
 
   return { list, users: rows };
+}
+
+export async function getCatalogProblemDetail(listKey: string) {
+  const list = catalog.lists.find((candidate) => candidate.key === listKey);
+  if (!list) {
+    return null;
+  }
+
+  const users = data.users.filter((user) => user.active).map((user) => ({
+    id: user.id,
+    displayName: user.displayName,
+    githubUsername: user.githubUsername,
+  }));
+  const communitySolutionCounts = getCommunitySolutionCounts();
+  const submissionsByUser = new Map(
+    data.users.map((user) => [user.id, new Map(user.submissions.map((submission) => [submission.problemKey, submission]))]),
+  );
+
+  const items = getListProblems(list).map((item) => ({
+    ...item,
+    submissions: Object.fromEntries(
+      users.map((user) => [user.id, submissionsByUser.get(user.id)?.get(item.problemKey) ?? null]),
+    ),
+    communitySolutionCount: communitySolutionCounts.get(item.problemKey) ?? 0,
+  }));
+
+  return { list, users, items };
 }

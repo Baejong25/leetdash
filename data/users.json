@@ -12,11 +12,29 @@
             "githubUsername": "yeochang-yoon",
             "active": true
         },
-		    {
-			      "id": "sayo",
-			      "displayName": "현지희",
-			      "githubUsername": "jhee22",
-			      "active": true
-		    }
+	    {
+		      "id": "sayo",
+		      "displayName": "현지희",
+		      "githubUsername": "jhee22",
+		      "active": true
+	    },
+		{
+			"id": "Baejong25",
+			"displayName": "배종혁",
+			"githubUsername": "Baejong25",
+			"active": true
+		},
+		{
+			"id": "jun795",
+			"displayName": "박상준",
+			"githubUsername": "jun795",
+			"active": true
+		},
+		{
+			"id": "jiwanne",
+			"displayName": "김지원",
+			"githubUsername": "jiwanne",
+			"active": true
+		}
     ]
 }

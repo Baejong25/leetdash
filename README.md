@@ -1,5 +1,23 @@
 # LeetCode Progress Radar
 
+## 서드파티 서비스 상태
+
+![OpenCode Go Gateway](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fgateway-status.json)
+![DeepSeek V4 Flash (AI Review)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fdeepseek-flash-status.json)
+![GitHub Pages](https://img.shields.io/github/deployments/whoisyourbias/leetdash/github-pages)
+![GitHub Actions - Deploy](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/deploy-pages.yml?branch=master)
+![GitHub Actions - OpenCode Review](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/opencode-review.yml)
+![GitHub Actions - Sweep](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/sweep-submission-prs.yml)
+
+| 서비스 | 상태 배지 | 용도 |
+| --- | --- | --- |
+| AI 리뷰 API · OpenCode Go 게이트웨이 | ![OpenCode Go Gateway](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fgateway-status.json) | 코드 리뷰 요청이 거치는 게이트웨이 연결 상태 |
+| AI 리뷰 API · DeepSeek V4 Flash | ![DeepSeek V4 Flash (AI Review)](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fwhoisyourbias%2Fleetdash%2Fstatus-data%2Fstatus%2Fdeepseek-flash-status.json) | 제출 PR의 solution.* 리뷰에 쓰는 모델 응답 상태 |
+| GitHub Pages | ![GitHub Pages](https://img.shields.io/github/deployments/whoisyourbias/leetdash/github-pages) | 대시보드 정적 배포 상태 |
+| GitHub Actions | ![GitHub Actions - Deploy](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/deploy-pages.yml?branch=master) ![GitHub Actions - OpenCode Review](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/opencode-review.yml) ![GitHub Actions - Sweep](https://img.shields.io/github/actions/workflow/status/whoisyourbias/leetdash/sweep-submission-prs.yml) | 검증·리뷰·머지·배포 CI/CD 워크플로우 상태 |
+
+AI 리뷰 API는 `deepseek-v4-flash` 모델을 OpenCode Go 게이트웨이(`https://opencode.ai/zen/go/v1`)를 통해 사용하며, 저장소 secret `OPENCODE_API_KEY`로 인증합니다 (DeepSeek의 직접 API가 아닙니다). 첫 두 배지는 `deepseek-status-check.yml` 워크플로우가 매시간(hourly) 실행되어 `status-data` 브랜치에 상태를 기록하며, 이 배지가 이를 읽습니다. 워크플로우 실행이 초록색이면 두 probe의 측정과 `status-data` 게시가 모두 성공했다는 뜻이며, 서비스가 내려가 있는 경우에도 측정 자체가 완료되면 게시가 정상 진행되므로 실행은 초록색으로 끝납니다. 즉 초록색 실행은 "서비스가 살아 있다"는 의미가 아니며, 각 API 배지는 해당 서비스의 측정 결과(up/down)를 그대로 표시합니다. GitHub Actions - OpenCode Review 배지는 이와 별개로 리뷰 워크플로우 실행 결과를 나타냅니다. 배지가 오래된 것처럼 보이면 GitHub Actions 탭에서 해당 워크플로우를 수동 실행(`workflow_dispatch`)할 수 있습니다 — GitHub는 공개 저장소에서 60일 이상 기본 브랜치 커밋이 없으면 예약 워크플로우를 일시 중지하므로, 장기간 활동이 없으면 배지 갱신이 멈출 수 있습니다. GitHub Pages 배포 URL: `https://whoisyourbias.github.io/leetdash/`.
+
 ## 제출 규칙
 
 풀이 폴더는 반드시 아래 소스별 규칙을 따릅니다. `slug`나 LeetCode 내부 ID는 참가자 폴더명으로 쓰지 않습니다.
@@ -223,12 +241,77 @@ gh run list --workflow sweep-submission-prs.yml --repo whoisyourbias/leetdash --
 
 새 토큰으로 sweep 성공을 확인하기 전에는 기존 토큰을 폐기하지 않습니다. 실패하면 실행 로그의 HTTP status, GitHub request ID, rate-limit 헤더를 기록하고 새 토큰의 저장소 선택과 권한을 다시 확인합니다. 성공 후에는 GitHub의 Personal access tokens 설정에서 이전 토큰만 폐기하고, 다음 만료일 전에 같은 절차로 교체합니다.
 
+## 문제 풀이 비교
+
+프로필의 문제 행에서 비교 화면으로 이동하는 흐름과, 비교 화면이 풀이 소스와 리뷰를 불러오는 방식을 설명합니다.
+
+### 프로필에서 비교 화면으로
+
+어떤 사용자의 프로필이든 해당 문제에 커뮤니티 풀이(현재 풀이 파일)가 하나 이상 있으면 문제 제목과 비교 액션 버튼이 비교 화면으로 연결됩니다. `?user=`에는 해당 프로필의 사용자 ID가 들어갑니다. 내 프로필과 다른 사용자의 프로필 모두 동일하게 동작하며, 요청된 사용자가 그 문제를 풀지 않았어도 연결은 유지됩니다. 커뮤니티 풀이가 없는 문제에는 비교 링크가 나타나지 않고 기존 문제 링크와 GitHub 링크만 남습니다.
+
+### 비교 화면 `/problems/[provider]/[problemId]/?user=<id>`
+
+- 이 경로는 풀이가 하나 이상 존재하는 카탈로그 문제에만 생성됩니다. 현재 체크인 데이터 기준 19개이며, 그 외 경로는 404입니다.
+- `?user=`가 가리키는 등록 사용자는 풀이 여부와 무관하게 선택 상태를 유지합니다. 풀지 않은 사용자면 "아직 풀지 않은 문제"로 표시하고 같은 화면에서 다른 풀이자를 고를 수 있습니다. 다른 사용자로 자동 전환하지 않습니다.
+- `?user=`가 없으면 첫 번째 풀이자가 선택됩니다. 등록되지 않은 사용자 ID면 알 수 없는 사용자 안내가 표시됩니다.
+- 풀이자 목록은 표시 이름 순서이며 상태, 언어, 리뷰 유무를 함께 보여줍니다.
+
+### 지연 로딩과 메타데이터 전용 규칙
+
+빌드 산출물에는 풀이 소스 본문이 들어가지 않습니다. 초기 라우트 HTML/JS, `data/progress.json`, 리뷰 JSON 어디에도 소스 코드 본문은 포함되지 않으며, 제출 레코드는 중앙 저장소, 커밋, 원시 URL, permalink, 경로 해시, 내용 해시만 담는 메타데이터입니다. 리뷰 본문도 초기 라우트 HTML/JS에는 포함되지 않고, 풀이자를 선택한 뒤 분할 리뷰 JSON을 지연 로딩합니다.
+
+브라우저는 GitHub 토큰을 받지 않습니다. 풀이자를 선택한 뒤에야 `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`에서 소스 파일을 지연 로딩합니다. 소스는 256 KiB 제한과 SHA-256 내용 검증을 거치며, 검증된 내용만 20개짜리 FIFO 메모리 캐시에 보관합니다. 검증 실패, 크기 초과, 404 같은 실패는 캐시하지 않고 오류 상태를 표시하며 커밋 고정 permalink를 대안으로 제공합니다.
+
+소스 URL은 배포된 master 커밋 SHA에 고정됩니다. 참가자 fork의 가변 브랜치를 읽지 않습니다.
+
+### 리뷰 생애주기
+
+리뷰의 원본(source of truth)은 GitHub 저장소의 이슈 코멘트입니다. master 배포 workflow가 `github-actions[bot]` 로그인의 코멘트 중 현재 경로/내용 해시와 정확히 일치하는 리뷰만 골라 `public/generated/reviews/<pathKey>/<contentKey>.json` 분할 에셋과 `index.json`을 생성합니다. 분할 리뷰 JSON에는 살균된 일반 텍스트 리뷰(`text`)와 줄 참조(`lineReferences`)가 들어 있습니다. `text`는 HTML이나 Markdown이 아니라 React 텍스트 노드로만 렌더링됩니다. 생성 에셋은 매 배포마다 새로 만들어지므로 언제든 삭제해도 됩니다. 원본 코멘트는 그대로 유지됩니다.
+
+`index.json`의 상태:
+
+- `complete`: 동기화 성공. `keys`에 현재 복합 해시 목록이 들어 있습니다. 현재 복합 키가 없으면 해당 풀이에는 현재 리뷰가 없는 것입니다("리뷰 없음").
+- `unavailable`: 배포 시점 동기화 실패(자격증명 누락, rate limit, 네트워크 오류 등). 리뷰가 없다는 뜻이 아니라 동기화가 되지 않았다는 뜻입니다. 배포는 계속 진행되고 사이트에는 "리뷰 동기화 불가" 상태가 표시되며 다음 성공 배포 후 갱신됩니다.
+
+### 로컬 빌드
+
+`npm run build`는 로컬에서 GitHub 토큰 없이 진행 데이터 생성(`build:data`)과 정적 빌드(`build:site`)만 실행합니다. 리뷰 동기화는 실행하지 않습니다.
+
+- `SOURCE_REVISION`이 40자리 16진수 SHA로 주어지지 않으면 제출 메타데이터에서 지연 로딩 URL 필드가 생략됩니다. 빌드는 실패하지 않습니다. master 배포는 `SOURCE_REVISION=${{ github.sha }}`로 고정합니다.
+- 로컬에서 `npm run reviews:sync`를 실행하면 자격증명이 없어 네트워크 호출 없이 `unavailable`(`credentials_missing`) `index.json`만 생성하고 종료 코드 0으로 끝납니다.
+
+### 배포 동작과 권한
+
+PR 빌드는 `typecheck`, `test`, `build`까지이며 토큰 없이 실행되고 리뷰 동기화를 하지 않습니다. master push와 workflow_dispatch는 데이터 생성 → 리뷰 동기화 → 사이트 빌드 순서로 진행됩니다.
+
+- 리뷰 동기화는 `GET /repos/{owner}/{repo}/issues/comments`를 최대 20페이지/2,000개 코멘트까지 읽습니다.
+- validate job 권한은 `contents: read`, `issues: read` 최소 권한입니다. GitHub token은 리뷰 동기화 스텝에만 노출됩니다.
+- 동기화 실패는 안전하게 처리됩니다. `index.json`에는 reason 코드만 남고 HTTP 상태나 요청 ID는 넣지 않습니다. workflow 경고 한 줄에만 `http_status`와 `request_id`가 남습니다. 종료 코드 0으로 배포는 계속됩니다.
+
+### 운영 확인
+
+토큰이나 코멘트 본문을 출력하지 않는 방법으로 동기화 상태를 확인합니다.
+
+```bash
+cat public/generated/reviews/index.json
+```
+
+`index.json`은 상태, reason, 카운트, 복합 키만 담고 코멘트 본문이나 토큰을 포함하지 않습니다. 배포 상태는 workflow 실행 목록으로 확인합니다.
+
+```bash
+gh run list --workflow deploy-pages.yml --repo whoisyourbias/leetdash
+gh run view <run-id> --repo whoisyourbias/leetdash
+```
+
+동기화 실패 시 workflow 로그의 sync 스텝에는 reason과 `http_status`, `request_id`만 나타나며 토큰이나 리뷰 본문은 출력되지 않습니다. 로컬에서 `npm run reviews:sync`를 실행해 자격증명 없이 동기화 동작을 안전하게 점검할 수도 있습니다.
+
 ## 라우트
 
 - `/`: 대시보드 요약과 사용자별 진행 테이블
 - `/admin`: 참가자 등록 현황과 Git 운영 안내
 - `/users/[userId]`: 사용자별 문제 진행 현황
 - `/lists/[listKey]`: 문제 목록별 랭킹
+- `/problems/[provider]/[problemId]`: 문제 풀이 비교 화면. `?user=<id>`로 프로필 사용자를 선택하며, 풀이가 있는 문제만 생성됩니다.
 
 ## 검증
 
@@ -247,3 +330,4 @@ npm run build
 - 예전 `solutions/<id>/` 및 slug 제출 폴더 무시
 - 신뢰된 OpenCode 리뷰 범위, 상태 gate 수명주기, workflow 실행·재시도 상관관계
 - 병합 직전 재검증, 개별 병합 실패 후 계속 스캔, 요약 작성 뒤 비정상 종료
+- 풀이 비교 라우트 파라미터, 지연 로딩/해시 검증/캐시, 리뷰 동기화 split 에셋 생성과 실패 폴백
