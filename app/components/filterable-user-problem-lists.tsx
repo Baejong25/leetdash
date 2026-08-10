@@ -220,7 +220,7 @@ export function FilterableUserProblemLists({ lists, providerLists = [], firstUns
                           id={isFirstUnsolvedProblem ? firstUnsolvedProblemTarget.elementId : undefined}
                           key={`${list.key}-${item.problemKey}`}
                         >
-                          <td className="mono">{item.order}</td>
+                          <td className="mono">{item.problem.problemId}</td>
                           <td>
                             {comparisonHref ? (
                               <Link className="problem-link" href={comparisonHref}>
