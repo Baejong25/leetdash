@@ -3,7 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const inputPath = process.argv[2];
+const LEETCODE_ONLY = process.argv[2] === "--leetcode-only";
+const inputPath = LEETCODE_ONLY ? undefined : process.argv[2];
 const markdown = inputPath ? readFileSync(inputPath, "utf8") : "";
 
 const toProblemKey = (provider, problemId) => `${provider}:${String(problemId)}`;
@@ -213,6 +214,75 @@ async function fetchProgrammersProblems() {
   return all;
 }
 
+async function fetchLeetCodeProblems() {
+  const endpoint = "https://leetcode.com/graphql";
+  const pageSize = 100;
+  const query = `
+    query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {
+      problemsetQuestionList: questionList(categorySlug: $categorySlug, limit: $limit, skip: $skip, filters: $filters) {
+        total: totalNum
+        questions: data { difficulty frontendQuestionId: questionFrontendId paidOnly: isPaidOnly title titleSlug }
+      }
+    }
+  `;
+
+  async function fetchPage(skip) {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Referer: "https://leetcode.com/problemset/all/",
+        "User-Agent": "leetdash-catalog-builder/1.0",
+      },
+      body: JSON.stringify({
+        operationName: "problemsetQuestionList",
+        query,
+        variables: { categorySlug: "", limit: pageSize, skip, filters: {} },
+      }),
+    });
+    if (!response.ok) throw new Error(`LeetCode GraphQL API ${response.status} at offset ${skip}`);
+    const payload = await response.json();
+    if (payload.errors?.length || !payload.data?.problemsetQuestionList) {
+      const message = payload.errors?.map((error) => error.message).join("; ") || "missing problemsetQuestionList";
+      throw new Error(`LeetCode GraphQL response error at offset ${skip}: ${message}`);
+    }
+    return payload.data.problemsetQuestionList;
+  }
+
+  const firstPage = await fetchPage(0);
+  const questions = [...firstPage.questions];
+  for (let skip = pageSize; skip < firstPage.total; skip += pageSize) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 150));
+    questions.push(...(await fetchPage(skip)).questions);
+  }
+  return [...new Map(questions.map((question) => [String(question.frontendQuestionId), question])).values()];
+}
+
+function createLeetCodeCatalogList(rawProblems) {
+  const difficultyLabels = { EASY: "easy", MEDIUM: "medium", HARD: "hard" };
+  const problems = rawProblems.map((raw) => createLeetCodeProblem({
+    leetcodeId: raw.frontendQuestionId,
+    slug: raw.titleSlug,
+    title: raw.title,
+    difficulty: difficultyLabels[raw.difficulty] ?? String(raw.difficulty).toLowerCase(),
+  })).sort((left, right) => Number(left.problemId) - Number(right.problemId));
+
+  return {
+    key: "leetcode",
+    title: "LeetCode",
+    url: "https://leetcode.com/problemset/all/",
+    summary: ["All LeetCode problems", "Includes free and premium catalog entries"],
+    problems,
+    items: problems.map((problem, index) => ({
+      problemKey: problem.problemKey,
+      order: index + 1,
+      section: problem.difficulty,
+      submissionKey: problem.problemId,
+    })),
+  };
+}
+
 function createProgrammersProblem(raw) {
   const problemId = String(raw.id);
   return {
@@ -300,15 +370,28 @@ const providerList = (problem, title) => ({
 });
 
 async function main() {
+  const SHOULD_FETCH_LEETCODE = LEETCODE_ONLY || !inputPath;
+  const existingCatalog = LEETCODE_ONLY
+    ? JSON.parse(readFileSync(resolve(root, "data/problem-catalog.json"), "utf8"))
+    : null;
   // Base LeetCode lists
-  const lists = [
-    topInterviewEasy,
-    leetcode75,
-    topInterview150,
-  ];
+  const lists = LEETCODE_ONLY
+    ? existingCatalog.lists.filter((list) => list.key !== "leetcode")
+    : [topInterviewEasy, leetcode75, topInterview150];
+
+  if (SHOULD_FETCH_LEETCODE) {
+    console.error("[build-catalog] Fetching all LeetCode problems from GraphQL...");
+    const leetcodeProblems = await fetchLeetCodeProblems();
+    lists.push(createLeetCodeCatalogList(leetcodeProblems));
+    console.error(`[build-catalog] LeetCode: ${leetcodeProblems.length} problems added`);
+  } else if (!LEETCODE_ONLY) {
+    const existingCatalog = JSON.parse(readFileSync(resolve(root, "data/problem-catalog.json"), "utf8"));
+    const leetcodeList = existingCatalog.lists.find((list) => list.key === "leetcode");
+    if (leetcodeList) lists.push(leetcodeList);
+  }
 
   // Fetch Programmers problems from API unless a markdown input file was provided
-  const SHOULD_FETCH_PROGRAMMERS = !process.argv[2];
+  const SHOULD_FETCH_PROGRAMMERS = !inputPath && !LEETCODE_ONLY;
   let programmersSourceUrl = "";
 
   if (SHOULD_FETCH_PROGRAMMERS) {
@@ -337,7 +420,7 @@ async function main() {
     });
 
     console.error(`[build-catalog] Programmers: ${programmerProblems.length} problems added`);
-  } else {
+  } else if (!LEETCODE_ONLY) {
     // Fallback: single hardcoded entry (legacy mode with markdown input)
     const programmersProblem = {
       provider: "programmers",
@@ -351,16 +434,23 @@ async function main() {
     lists.push(providerList(programmersProblem, "Programmers"));
   }
 
-  // SWEA (fetch all problems from SW Expert Academy)
-  console.error("[build-catalog] Fetching SWEA problems...");
-  const sweaRaw = await fetchSweaProblems();
-  lists.push(createSweaList(sweaRaw));
-  console.error(`[build-catalog] SWEA: ${lists[lists.length - 1].problems.length} problems added`);
+  if (!LEETCODE_ONLY) {
+    // SWEA (fetch all problems from SW Expert Academy)
+    console.error("[build-catalog] Fetching SWEA problems...");
+    const sweaRaw = await fetchSweaProblems();
+    lists.push(createSweaList(sweaRaw));
+    console.error(`[build-catalog] SWEA: ${lists[lists.length - 1].problems.length} problems added`);
+  }
 
   // Build unique problems map
   const problemsByKey = new Map();
+  if (LEETCODE_ONLY) {
+    for (const problem of existingCatalog.problems) {
+      problemsByKey.set(problem.problemKey, problem);
+    }
+  }
   for (const list of lists) {
-    for (const problem of list.problems) {
+    for (const problem of list.problems ?? []) {
       const existing = problemsByKey.get(problem.problemKey);
       if (!existing || existing.title.length < problem.title.length) {
         problemsByKey.set(problem.problemKey, problem);
@@ -370,7 +460,9 @@ async function main() {
 
   const catalog = {
     generatedAt: new Date().toISOString().slice(0, 10),
-    sources: [
+    sources: [...new Set([
+      ...(existingCatalog?.sources ?? []),
+      "https://leetcode.com/problemset/all/",
       "https://leetcode.com/explore/featured/card/top-interview-questions-easy/",
       "https://leetcode.com/studyplan/leetcode-75/",
       "https://leetcode.com/studyplan/top-interview-150/",
@@ -378,7 +470,7 @@ async function main() {
       "https://blog.nuomi1.com/archives/2018/12/leetcode-top-interview-questions-easy-swift-exercises.html",
       programmersSourceUrl,
       "https://swexpertacademy.com/main/code/problem/problemList.do",
-    ],
+    ])].filter(Boolean),
     lists,
     problems: [...problemsByKey.values()].sort((a, b) => {
       const providerOrder = ["leetcode", "programmers", "swea"];
