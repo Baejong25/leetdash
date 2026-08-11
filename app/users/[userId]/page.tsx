@@ -7,6 +7,7 @@ import { FirstUnsolvedProblemScroller } from "@/app/components/first-unsolved-pr
 import { formatDateKey, formatPercent } from "@/lib/format";
 import { getGithubProfileUrl } from "@/lib/github";
 import { formatCatalogListTitle } from "@/lib/i18n";
+import { getProblemRecommendationHref } from "@/lib/problem-recommendation-link";
 import { getUserDetail, listStaticUsers } from "@/lib/progress";
 
 export const dynamicParams = false;
@@ -47,6 +48,14 @@ export default async function UserDetailPage({ params }: { params: Promise<{ use
             제출물은 master 브랜치 스냅샷의 <span className="mono">{user.submissionsPath}</span>에서 읽습니다.
           </p>
         </div>
+        <a
+          className="button primary"
+          href={getProblemRecommendationHref(user.submissionsPath)}
+          rel="noreferrer"
+          target="_blank"
+        >
+          문제 추천 받기
+        </a>
       </div>
 
       <section className="list-grid" aria-label="사용자 진행 현황">
