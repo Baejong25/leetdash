@@ -279,11 +279,66 @@ describe("reviewPullRequest", () => {
     expect(completed.at(-1)).toMatchObject({ conclusion: "success" });
   });
 
+  it("stops later model requests after a retryable failure so recovery can rerun within the job budget", async () => {
+    const reviewCalls = [];
+    const { options, comments } = reviewOptions({
+      changedFiles: [{ status: "A", path: firstPath }, { status: "M", path: secondPath }],
+      openCodeClient: { review: async ({ prompt, attempt }) => {
+        reviewCalls.push({ prompt, attempt });
+        throw new ReviewFailure({
+          stage: "model-request",
+          reason: "MODEL_REQUEST_FAILED",
+          detail: "safe",
+          retryable: true,
+        });
+      } },
+    });
+
+    const result = await reviewPullRequest(options);
+
+    expect(reviewCalls).toHaveLength(2);
+    expect(reviewCalls.map(({ attempt }) => attempt)).toEqual([1, 2]);
+    expect(reviewCalls.every(({ prompt }) => prompt.includes(firstPath))).toBe(true);
+    expect(result.results).toMatchObject([{
+      path: firstPath,
+      status: "warning",
+      failure: { retryable: true, attemptCount: 2 },
+    }]);
+    expect(comments.some(({ body }) => body.includes(secondPath))).toBe(false);
+    expect(result.markdown).toContain("복구 대기: 1개");
+  });
+
+  it("still opens the circuit when managed comment discovery is unavailable", async () => {
+    let reviewCalls = 0;
+    const { options } = reviewOptions({
+      changedFiles: [{ status: "A", path: firstPath }, { status: "M", path: secondPath }],
+      openCodeClient: { review: async () => {
+        reviewCalls += 1;
+        throw new ReviewFailure({
+          stage: "model-request",
+          reason: "MODEL_REQUEST_FAILED",
+          detail: "safe",
+          retryable: true,
+        });
+      } },
+    });
+    options.githubClient.listManagedReviewComments = async () => {
+      throw new GitHubDeliveryFailure({ retryable: true, httpStatus: 503 });
+    };
+
+    const result = await reviewPullRequest(options);
+
+    expect(reviewCalls).toBe(2);
+    expect(result.results).toHaveLength(1);
+    expect(result.markdown).toContain("복구 대기: 1개");
+    expect(result.deliveryFailureCount).toBeGreaterThan(0);
+  });
+
   it("retries a retryable model-request failure once and recovers with a normal review", async () => {
     const attempts = [];
     const { options, comments, completed } = reviewOptions({
-      openCodeClient: { review: async () => {
-        attempts.push("attempt");
+      openCodeClient: { review: async ({ attempt }) => {
+        attempts.push(attempt);
         if (attempts.length === 1) {
           throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: true });
         }
@@ -293,7 +348,7 @@ describe("reviewPullRequest", () => {
 
     const result = await reviewPullRequest(options);
 
-    expect(attempts).toHaveLength(2);
+    expect(attempts).toEqual([1, 2]);
     expect(result.results).toMatchObject([{ path: firstPath, status: "reviewed" }]);
     expect(comments[0].body).toContain("찰싹봇의 코드 리뷰");
     expect(comments[0].body).not.toContain("리뷰 경고");
@@ -303,19 +358,19 @@ describe("reviewPullRequest", () => {
   it("publishes a warning after two retryable model-request failures", async () => {
     const attempts = [];
     const { options, comments, completed } = reviewOptions({
-      openCodeClient: { review: async () => {
-        attempts.push("attempt");
+      openCodeClient: { review: async ({ attempt }) => {
+        attempts.push(attempt);
         throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: true });
       } },
     });
 
     const result = await reviewPullRequest(options);
 
-    expect(attempts).toHaveLength(2);
+    expect(attempts).toEqual([1, 2]);
     expect(result.results).toMatchObject([{
       path: firstPath,
       status: "warning",
-      failure: { stage: "model-request", reason: "MODEL_REQUEST_FAILED" },
+      failure: { stage: "model-request", reason: "MODEL_REQUEST_FAILED", attemptCount: 2 },
     }]);
     expect(comments[0].body).toContain("찰싹봇 리뷰 경고");
     expect(completed.at(-1)).toMatchObject({ conclusion: "success" });
@@ -1135,10 +1190,12 @@ describe("opencode-review CLI", () => {
   it("retries twice and fails the review gate when both model requests are retryable failures", async () => {
     const { options, completed, statuses } = reviewOptions();
     let attempts = 0;
+    const recoveryMarkerPath = path.join(await mkdtemp(path.join(tmpdir(), "opencode-recovery-")), "marker.json");
+    const headSha = "c".repeat(40);
 
     const outcome = await main({
       mascotUrl,
-      argv: ["--base", "base", "--head", "head", "--pull-number", "42"],
+      argv: ["--base", "base", "--head", headSha, "--pull-number", "42"],
       env: {
         GITHUB_REPOSITORY: "example/leetdash",
         GITHUB_TOKEN: "github-secret",
@@ -1146,6 +1203,7 @@ describe("opencode-review CLI", () => {
         GITHUB_RUN_ID: "9",
         GITHUB_RUN_ATTEMPT: "1",
         OPENCODE_API_KEY: "opencode-secret",
+        OPENCODE_RECOVERY_MARKER_PATH: recoveryMarkerPath,
         OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
       },
       loadReviewScope: async () => ({ submissionOnly: true, changedFiles: [{ status: "A", path: firstPath }] }),
@@ -1162,6 +1220,44 @@ describe("opencode-review CLI", () => {
     expect(outcome.exitCode).toBe(1);
     expect(completed[0].conclusion).toBe("success");
     expect(statuses.map(({ state }) => state)).toEqual(["pending", "failure"]);
+    await expect(readFile(recoveryMarkerPath, "utf8").then(JSON.parse)).resolves.toEqual({
+      schemaVersion: 1,
+      classification: "retryable_failure",
+      headSha,
+      pullNumber: 42,
+      runAttempt: 1,
+      failedFiles: 1,
+    });
+  });
+
+  it("does not publish a recovery marker for a permanent model failure", async () => {
+    const { options } = reviewOptions();
+    const recoveryMarkerPath = path.join(await mkdtemp(path.join(tmpdir(), "opencode-recovery-")), "marker.json");
+
+    const outcome = await main({
+      mascotUrl,
+      argv: ["--base", "base", "--head", "d".repeat(40), "--pull-number", "42"],
+      env: {
+        GITHUB_REPOSITORY: "example/leetdash",
+        GITHUB_TOKEN: "github-secret",
+        GITHUB_SERVER_URL: "https://github.example",
+        GITHUB_RUN_ID: "9",
+        GITHUB_RUN_ATTEMPT: "1",
+        OPENCODE_API_KEY: "opencode-secret",
+        OPENCODE_RECOVERY_MARKER_PATH: recoveryMarkerPath,
+        OPENCODE_REVIEW_MODEL: "opencode-go/deepseek-v4-flash",
+      },
+      loadReviewScope: async () => ({ submissionOnly: true, changedFiles: [{ status: "A", path: firstPath }] }),
+      githubClient: options.githubClient,
+      openCodeClient: { review: async () => {
+        throw new ReviewFailure({ stage: "model-request", reason: "MODEL_REQUEST_FAILED", detail: "safe", retryable: false });
+      } },
+      catalog,
+      readFile: options.readFile,
+    });
+
+    expect(outcome.exitCode).toBe(1);
+    await expect(readFile(recoveryMarkerPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("fails the review gate when GitHub comment delivery is incomplete", async () => {

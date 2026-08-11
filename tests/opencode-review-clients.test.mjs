@@ -10,11 +10,15 @@ function jsonResponse(body, { status = 200, headers = {} } = {}) {
 describe("OpenCodeClient", () => {
   it("sends the provider-stripped model request and returns only assistant content", async () => {
     const requests = [];
+    const logs = [];
+    const clientRequestId = "123e4567-e89b-42d3-a456-426614174000";
     const client = new OpenCodeClient({
       fetchImpl: async (url, init) => {
         requests.push({ url: String(url), init });
         return jsonResponse({ choices: [{ message: { role: "assistant", content: "review result" } }] });
       },
+      logger: { log: (message) => { logs.push(message); } },
+      requestIdFactory: () => clientRequestId,
     });
 
     await expect(client.review({
@@ -25,10 +29,14 @@ describe("OpenCodeClient", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe("https://opencode.ai/zen/go/v1/chat/completions");
     expect(requests[0].init.headers.Authorization).toBe("Bearer test-secret");
+    expect(requests[0].init.headers["x-opencode-request"]).toBe(clientRequestId);
     expect(JSON.parse(requests[0].init.body)).toEqual({
       model: "deepseek-v4-flash",
       messages: [{ role: "user", content: "review prompt" }],
     });
+    expect(logs).toEqual([
+      `OpenCode request outcome=success attempt=1 client_request_id=${clientRequestId} status=200`,
+    ]);
   });
 
   it("times out stalled response-body parsing with a sanitized model-request failure", async () => {

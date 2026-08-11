@@ -8,7 +8,7 @@ const reviewFileMarkerPattern = /^<!-- leetdash-opencode-review-file:([a-f0-9]{6
 const reviewContentMarkerPattern = /^<!-- leetdash-opencode-review-content:([a-f0-9]{64}) -->$/;
 
 class ReviewFailure extends Error {
-  constructor({ stage, reason, detail, retryable = false, httpStatus, requestId }) {
+  constructor({ stage, reason, detail, retryable = false, httpStatus, requestId, clientRequestId, attemptCount }) {
     super(detail);
     this.name = "ReviewFailure";
     this.stage = stage;
@@ -17,6 +17,8 @@ class ReviewFailure extends Error {
     this.retryable = retryable;
     this.httpStatus = httpStatus;
     this.requestId = requestId;
+    this.clientRequestId = clientRequestId;
+    this.attemptCount = attemptCount;
   }
 }
 
@@ -221,6 +223,8 @@ function warningLines(failure) {
   ];
   if (failure.httpStatus !== undefined) lines.push(`HTTP 상태: ${markdownText(failure.httpStatus)}`);
   if (failure.requestId !== undefined) lines.push(`요청 ID: ${markdownText(failure.requestId)}`);
+  if (failure.clientRequestId !== undefined) lines.push(`클라이언트 요청 ID: ${markdownText(failure.clientRequestId)}`);
+  if (failure.attemptCount !== undefined) lines.push(`시도 횟수: ${markdownText(failure.attemptCount)}`);
   return lines;
 }
 
@@ -258,6 +262,7 @@ function renderReviewSummary({
   reviewedCount,
   reusedCount = 0,
   warningCount,
+  deferredCount = 0,
   deliveryFailureCount,
   message,
 }) {
@@ -269,6 +274,7 @@ function renderReviewSummary({
       `리뷰 완료: ${reviewedCount}개`,
       `리뷰 유지: ${reusedCount}개`,
       `리뷰 경고: ${warningCount}개`,
+      ...(deferredCount > 0 ? [`복구 대기: ${deferredCount}개`] : []),
       `댓글 전달 실패: ${deliveryFailureCount}개`,
     ]),
     `워크플로: ${markdownText(runUrl)}`,

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   isRetryableStatus,
   openCodeApiModel,
@@ -19,7 +21,7 @@ function extractRequestId(response) {
   return undefined;
 }
 
-function toSafeHttpFailure({ stage, reason, response, detail = "External service request failed." }) {
+function toSafeHttpFailure({ stage, reason, response, clientRequestId, detail = "External service request failed." }) {
   const httpStatus = response?.status;
   return new ReviewFailure({
     stage,
@@ -28,6 +30,7 @@ function toSafeHttpFailure({ stage, reason, response, detail = "External service
     retryable: isRetryableStatus(httpStatus),
     ...(httpStatus === undefined ? {} : { httpStatus }),
     ...(extractRequestId(response) === undefined ? {} : { requestId: extractRequestId(response) }),
+    clientRequestId,
   });
 }
 
@@ -66,11 +69,13 @@ function toSafeGitHubFailure(FailureType, response) {
 }
 
 class OpenCodeClient {
-  constructor({ fetchImpl = fetch } = {}) {
+  constructor({ fetchImpl = fetch, logger = console, requestIdFactory = randomUUID } = {}) {
     this.fetchImpl = fetchImpl;
+    this.logger = logger;
+    this.requestIdFactory = requestIdFactory;
   }
 
-  async review({ model, apiKey, prompt }) {
+  async review({ model, apiKey, prompt, attempt = 1 }) {
     if (model !== openCodeConfiguredModel) {
       throw new ReviewFailure({
         stage: "model-request",
@@ -79,14 +84,28 @@ class OpenCodeClient {
       });
     }
 
+    const clientRequestId = this.requestIdFactory();
+    const logOutcome = ({ outcome, status, requestId }) => {
+      const fields = [
+        `outcome=${outcome}`,
+        `attempt=${attempt}`,
+        `client_request_id=${clientRequestId}`,
+      ];
+      if (status !== undefined) fields.push(`status=${status}`);
+      if (requestId !== undefined) fields.push(`provider_request_id=${requestId}`);
+      try {
+        this.logger?.log?.(`OpenCode request ${fields.join(" ")}`);
+      } catch {
+        // Diagnostics must never change the review outcome.
+      }
+    };
     const controller = new AbortController();
-    const requestFailure = (error) => new ReviewFailure({
+    const requestFailure = () => new ReviewFailure({
       stage: "model-request",
       reason: "MODEL_REQUEST_FAILED",
       retryable: true,
-      detail: error instanceof Error && error.message
-        ? `OpenCode request failed: ${error.message}`
-        : "OpenCode request failed.",
+      detail: "OpenCode request failed due to a transport error.",
+      clientRequestId,
     });
     let timeout;
     const timeoutFailure = new Promise((_resolve, reject) => {
@@ -96,6 +115,7 @@ class OpenCodeClient {
           reason: "MODEL_REQUEST_FAILED",
           retryable: true,
           detail: `OpenCode request timed out after ${openCodeRequestTimeoutMs / 1000}s.`,
+          clientRequestId,
         }));
         controller.abort();
       }, openCodeRequestTimeoutMs);
@@ -109,6 +129,7 @@ class OpenCodeClient {
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
+              "x-opencode-request": clientRequestId,
             },
             body: JSON.stringify({
               model: openCodeApiModel,
@@ -119,39 +140,57 @@ class OpenCodeClient {
           timeoutFailure,
         ]);
       } catch (error) {
-        if (error instanceof ReviewFailure) throw error;
-        throw requestFailure(error);
+        const failure = error instanceof ReviewFailure ? error : requestFailure();
+        logOutcome({ outcome: "failure" });
+        throw failure;
       }
 
       if (!response?.ok) {
-        throw toSafeHttpFailure({
+        const failure = toSafeHttpFailure({
           stage: "model-request",
           reason: "MODEL_REQUEST_FAILED",
           response,
+          clientRequestId,
           detail: `OpenCode request failed (HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}).`,
         });
+        logOutcome({ outcome: "failure", status: failure.httpStatus, requestId: failure.requestId });
+        throw failure;
       }
 
       let body;
       try {
         body = await Promise.race([response.json(), timeoutFailure]);
       } catch (error) {
-        if (error instanceof ReviewFailure) throw error;
-        if (controller.signal.aborted) throw requestFailure();
-        throw new ReviewFailure({
+        if (error instanceof ReviewFailure) {
+          logOutcome({ outcome: "failure" });
+          throw error;
+        }
+        if (controller.signal.aborted) {
+          const failure = requestFailure();
+          logOutcome({ outcome: "failure" });
+          throw failure;
+        }
+        const failure = new ReviewFailure({
           stage: "model-response",
           reason: "MODEL_RESPONSE_INVALID",
           detail: "OpenCode returned an invalid response.",
+          clientRequestId,
         });
+        logOutcome({ outcome: "failure", status: response.status, requestId: extractRequestId(response) });
+        throw failure;
       }
       const parsed = parseAssistantResponse(body);
       if (!parsed.ok) {
-        throw new ReviewFailure({
+        const failure = new ReviewFailure({
           stage: "model-response",
           reason: "MODEL_RESPONSE_INVALID",
           detail: "OpenCode response is missing assistant content.",
+          clientRequestId,
         });
+        logOutcome({ outcome: "failure", status: response.status, requestId: extractRequestId(response) });
+        throw failure;
       }
+      logOutcome({ outcome: "success", status: response.status, requestId: extractRequestId(response) });
       return parsed.content;
     } finally {
       clearTimeout(timeout);
