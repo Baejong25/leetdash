@@ -1,4 +1,4 @@
-import { appendFile, lstat, readFile } from "node:fs/promises";
+import { appendFile, lstat, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,7 @@ import {
 const solutionName = /^solution\.[^.\/]+$/i;
 const deliveryDiagnostic = "Comment delivery: GitHub review comment delivery failed.";
 const embeddedSourceRedactionMinimumLength = 16;
+const recoveryMarkerSchemaVersion = 1;
 
 const safeFailures = Object.freeze({
   "catalog-resolve": ["CATALOG_MAPPING_FAILED", "Submission review paths could not be resolved."],
@@ -45,6 +46,34 @@ function isReviewableSolution(file) {
 
 async function appendReviewSummary(markdown, summaryPath) {
   if (summaryPath) await appendFile(summaryPath, `${markdown}\n`, "utf8");
+}
+
+function isRetryableReviewResult(result) {
+  return (
+    result?.conclusion === "success"
+    && result.failure === undefined
+    && result.deliveryFailureCount === 0
+    && Array.isArray(result.failures)
+    && result.failures.length > 0
+    && result.failures.every((failure) => (
+      failure?.stage === "model-request"
+      && failure?.reason === "MODEL_REQUEST_FAILED"
+      && failure?.retryable === true
+    ))
+  );
+}
+
+async function writeRetryableRecoveryMarker(markerPath, { headSha, pullNumber, runAttempt, failures }) {
+  if (!markerPath) return;
+  const marker = {
+    schemaVersion: recoveryMarkerSchemaVersion,
+    classification: "retryable_failure",
+    headSha,
+    pullNumber,
+    runAttempt,
+    failedFiles: failures.length,
+  };
+  await writeFile(markerPath, `${JSON.stringify(marker)}\n`, { encoding: "utf8", flag: "wx" });
 }
 
 function failureForStage(stage) {
@@ -225,9 +254,10 @@ function redactModelText(value, source) {
 async function reviewWithRetry({ openCodeClient, model, apiKey, prompt }) {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await openCodeClient.review({ model, apiKey, prompt });
+      return await openCodeClient.review({ model, apiKey, prompt, attempt });
     } catch (error) {
       const failure = error instanceof ReviewFailure ? error : undefined;
+      if (failure) failure.attemptCount = attempt;
       if (attempt >= 2 || !failure || failure.stage !== "model-request" || failure.retryable !== true) throw error;
     }
   }
@@ -392,8 +422,14 @@ async function reviewPullRequest({
         const body = result.status === "reviewed"
           ? renderReviewFileComment({ path: result.path, sourceUrl, contentKey: result.contentKey, headSha, runUrl, mascotUrl, markdown: result.markdown, lineCount: result.lineCount })
           : renderReviewFileWarning({ path: result.path, sourceUrl, headSha, runUrl, mascotUrl, failure: result.failure });
+        const shouldStopModelRequests = (
+          result.status === "warning"
+          && result.failure?.stage === "model-request"
+          && result.failure?.retryable === true
+        );
         if (!commentDiscoveryAvailable) {
           deliveryFailureCount += 1;
+          if (shouldStopModelRequests) break;
           continue;
         }
         try {
@@ -405,6 +441,7 @@ async function reviewPullRequest({
         } catch {
           deliveryFailureCount += 1;
         }
+        if (shouldStopModelRequests) break;
       }
 
       if (commentDiscoveryAvailable) {
@@ -422,6 +459,7 @@ async function reviewPullRequest({
       const reviewedCount = results.filter((result) => result.status === "reviewed").length;
       const reusedCount = results.filter((result) => result.status === "reused").length;
       const warningCount = results.filter((result) => result.status === "warning").length;
+      const deferredCount = paths.length - results.length;
       const summaryArgs = {
         headSha,
         runUrl,
@@ -429,6 +467,7 @@ async function reviewPullRequest({
         reviewedCount,
         reusedCount,
         warningCount,
+        deferredCount,
         deliveryFailureCount,
         ...(paths.length === 0 ? { message: "변경된 solution.* 파일이 없어 리뷰를 생략했습니다." } : {}),
       };
@@ -599,6 +638,14 @@ async function main(options = {}) {
       description: passed ? "OpenCode review passed." : "OpenCode review failed.",
       targetUrl: runUrl,
     });
+    if (!passed && isRetryableReviewResult(result)) {
+      await writeRetryableRecoveryMarker(env.OPENCODE_RECOVERY_MARKER_PATH, {
+        headSha: args.head,
+        pullNumber: Number(args.pullNumber),
+        runAttempt: Number(env.GITHUB_RUN_ATTEMPT),
+        failures: result.failures,
+      });
+    }
     return { exitCode: passed ? 0 : 1, result };
   } catch (error) {
     try {
@@ -623,4 +670,12 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
   });
 }
 
-export { appendReviewSummary, defaultSourceReader, loadTrustedPullRequestScope, main, reviewPullRequest };
+export {
+  appendReviewSummary,
+  defaultSourceReader,
+  isRetryableReviewResult,
+  loadTrustedPullRequestScope,
+  main,
+  reviewPullRequest,
+  writeRetryableRecoveryMarker,
+};

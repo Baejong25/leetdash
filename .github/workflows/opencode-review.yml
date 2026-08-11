@@ -59,4 +59,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          OPENCODE_RECOVERY_MARKER_PATH: ${{ runner.temp }}/opencode-review-recovery.json
           OPENCODE_REVIEW_MODEL: ${{ vars.OPENCODE_REVIEW_MODEL }}
+
+      - name: Publish retryable failure marker
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-review-retryable-${{ github.run_attempt }}-${{ steps.resolve-pr.outputs.pull-number }}-${{ steps.resolve-pr.outputs.head-sha }}
+          path: ${{ runner.temp }}/opencode-review-recovery.json
+          if-no-files-found: ignore
+          retention-days: 1

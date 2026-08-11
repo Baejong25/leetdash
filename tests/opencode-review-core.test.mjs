@@ -363,6 +363,8 @@ describe("review Markdown rendering", () => {
         retryable: true,
         httpStatus: 429,
         requestId: "request-42",
+        clientRequestId: "client-request-42",
+        attemptCount: 2,
       }),
       runUrl: "https://github.com/example/leetdash/actions/runs/42",
     });
@@ -375,5 +377,7 @@ describe("review Markdown rendering", () => {
     expect(markdown).toContain("재시도 가능: 예");
     expect(markdown).toContain("HTTP 상태: 429");
     expect(markdown).toContain("요청 ID: request-42");
+    expect(markdown).toContain("클라이언트 요청 ID: client-request-42");
+    expect(markdown).toContain("시도 횟수: 2");
   });
 });
