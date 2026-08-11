@@ -41,6 +41,12 @@
 			"displayName": "오찬주",
 			"githubUsername": "ohchanju3",
 			"active": true
+		},
+		{
+			"id": "choonsikJS",
+			"displayName": "공준식",
+			"githubUsername": "choonsikJS",
+			"active": true
 		}
     ]
 }
