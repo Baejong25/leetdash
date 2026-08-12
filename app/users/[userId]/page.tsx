@@ -50,7 +50,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ use
         </div>
         <a
           className="button primary"
-          href={getProblemRecommendationHref(user.submissionsPath)}
+          href={getProblemRecommendationHref(user.submissionsPath, user.submissions.length > 0)}
           rel="noreferrer"
           target="_blank"
         >
