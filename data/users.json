@@ -47,6 +47,30 @@
 			"displayName": "공준식",
 			"githubUsername": "ChoonsikJS",
 			"active": true
+		},
+		{
+			"id": "Jin-yujin",
+			"displayName": "진유진",
+			"githubUsername": "Jin-yujin",
+			"active": true
+		},
+		{
+			"id": "r0mmmy",
+			"displayName": "한새롬",
+			"githubUsername": "r0mmmy",
+			"active": true
+		},
+		{
+			"id": "yunaoov",
+			"displayName": "양유나",
+			"githubUsername": "yunaoov",
+			"active": true
+		},
+		{
+			"id": "ysw981209-rgb",
+			"displayName": "유승완",
+			"githubUsername": "ysw981209-rgb",
+			"active": true
 		}
     ]
 }
