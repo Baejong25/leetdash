@@ -71,6 +71,12 @@
 			"displayName": "유승완",
 			"githubUsername": "ysw981209-rgb",
 			"active": true
+		},
+		{
+			"id": "ijeonghwan",
+			"displayName": "이정환",
+			"githubUsername": "ijeonghwan",
+			"active": true
 		}
     ]
 }
